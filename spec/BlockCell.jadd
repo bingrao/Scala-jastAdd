@@ -1,0 +1,105 @@
+aspect BlockCell {
+	/** 
+	 * @author Bing
+	 * Based on WHILE Progect, I defined a block interface to mask the block element
+	 * in my scala program, I assume the basical block element are four type statement as followed:
+	 * ****assignment statment;
+	 * ****variable declare statement;
+	 * ****variable decfine statement 
+	 * ****Label condition expression statement 
+	 * */
+	public interface BlockCell {
+		Set<NumLabel> inFlows();  	/*The entry of BlockCell*/
+		Set<NumLabel> outFlows(); 	/*the exit of a BlockCell*/
+		NumLabel getLabelAST(); 	/*Record the current the NumLabel of block*/
+		String unParseBlocks(); 	/*unParse the current block info*/
+	}
+	AssignS implements BlockCell;
+	VarDecl implements BlockCell;
+	VarDef 	implements BlockCell;
+	LExp 	implements BlockCell;
+	
+	/**Here we can use unParse() or prettyPrint() to print the info of this blockcell*/
+	syn String AssignS.unParseBlocks() = this.unParse();
+	syn String VarDecl.unParseBlocks() = this.unParse();
+	syn String VarDef.unParseBlocks() = this.unParse();
+	syn String LExp.unParseBlocks() = this.unParse();
+	
+	// the following are needed so that Blocks can be hashed...
+	/** Are these Blocks equal? */
+ 	public boolean BlockCell.equals(Object oth) {
+  	    if (oth == null || !(oth instanceof BlockCell)) { return false; }
+ 	    BlockCell b = (BlockCell) oth;
+	    return toString().equals(b.toString());
+    }
+  	/** 
+  	 * Because I use unique label to identify a basic blcok,so here I use the 
+  	 * Label as the hash code for this block
+     */
+	public int BlockCell.hashCode() {
+	    return getLabelAST().hashCode();
+	}
+	
+	/** Mapping from labels back to blocks. */
+	inh BlockCell NumLabel.itsBlockCell();
+	eq AssignS.getLabelAST().itsBlockCell() = this;
+	eq VarDecl.getLabelAST().itsBlockCell() = this;
+	eq VarDef.getLabelAST().itsBlockCell() = this;
+	eq LExp.getLabelAST().itsBlockCell() = this;
+	
+	/**Print current block data flow information*/
+	public void BlockCell.printAnalysis(StringBuilder sb, int t){
+		if(sb.toString().contains("Available Expressions Analysis")){
+			this.printAE(sb,t);
+		}
+		if(sb.toString().contains("Reaching Definitions Analysis")){
+			this.printRD(sb,t);
+		}
+		if(sb.toString().contains("VeryBusy Expressions Analysis")){
+			this.printVB(sb,t);
+		}
+		if(sb.toString().contains("Live Variables Analysis")){
+			this.printLV(sb,t);
+		}
+	}
+	/*
+	 * Reference module 
+	 * Compare with Reference module to check the type information of  the given variable 
+	 */
+	public void BlockCell.typeInference(Map<String,Type> vt,StringBuilder sb,String var,Type newType)
+  	{
+  		Type oldType = null;
+  		sb.append(" /*");
+  		if(vt.containsKey(var)){
+			/*var exist in the Reference Module*/
+			oldType = vt.get(var);
+			if(oldType == newType){
+				if((newType == Type.Error)||(newType == Type.Unknown))
+					sb.append("Type Error:");
+				else
+					sb.append("Type Normal:");
+			}else if(oldType == Type.Unknown){
+				if(newType == Type.Error){
+					sb.append("Type Error:");
+				}else{
+					sb.append("Type Normal:");
+					vt.put(var,newType);
+				}
+			}else{
+				/* types are not equal*/
+				sb.append("Type Error: ");
+			}
+		}else{
+			/*variables do not exist in the Reference Module*/
+			oldType = newType;
+			if(newType == Type.Error){
+				sb.append("Type Error:");
+				vt.put(var,Type.Unknown);
+			}else{
+				sb.append("Type Normal:");
+				vt.put(var,newType);
+			}
+		}
+		sb.append(newType+" -> "+oldType+"*/").append("\n");
+  	}
+}

@@ -1,0 +1,385 @@
+/**
+ * 
+ * @author Bing
+ * 
+ * Tranverse the AST and Type Checking the program then print it out
+ */
+import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+import utility.SetRepUtility;
+import utility.Type;
+aspect ScalaTypeCheck {
+	/*
+	 * Define Statement TypeChecking Function
+	 */
+	public void Program.printTypeChecking(){
+		/*Program ::= Member:Class*;*/
+		StringBuilder sb = new StringBuilder();
+		Map<String,Type> vt = new HashMap<String,Type>();
+		for(Class m : getMemberList()){
+			m.TypeChecking(vt,sb,0);
+			sb.append("\n");
+		}
+		System.out.println("###############The TypeChecking info:\n"+sb.toString());
+		
+		Iterator<Map.Entry<String, Type>> it = vt.entrySet().iterator();
+		System.out.println("##############The variable info:");
+		System.out.println("\nVariable"+"\t \t"+"TypeInfo");
+		while(it.hasNext())
+		{
+			Map.Entry<String,Type> var = it.next();
+			System.out.println(var.getKey()+"\t\t-\t"+var.getValue().getName());
+		}		
+	}
+	public void Class.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;*/
+		getClassType().TypeChecking(vt,sb,t);
+		sb.append(" Class ").append(getClassName()).append("{\n");
+		
+		if(getProperties() != null)
+			getProperties().TypeChecking(vt,sb,t);
+		else
+			sb.append("\tNo Properties\n");
+		
+		if(getMethods() != null)
+			getMethods().TypeChecking(vt,sb,t);
+		else
+			sb.append("\tNo Methods\n");
+		
+		sb.append(getIndent(t)).append("}\n");
+	}
+	public void Properties.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t) {
+		//Properties ::= PropS:Blockstmt*;
+		for (Blockstmt bs : getPropSList()) {
+			bs.TypeChecking(vt,sb,t+1);
+			sb.append("\n");
+		}
+	} 
+	public void Methods.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t) {
+		//Methods  ::= Funcs:Function*;
+		sb.append("\n");
+		for(Function f : getFuncsList()){
+			f.TypeChecking(vt,sb,t+1);
+			sb.append("\n");	
+		}
+		sb.append("\n");
+	}
+	public void Function.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t) {
+		//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+		sb.append(getIndent(t)).append("def ").append(getFuncName()).append("(");
+		if(getFParam() != null)
+			getFParam().TypeChecking(vt,sb,0);
+		sb.append(") : ");
+		if(getReturnType() != null)
+			getReturnType().TypeChecking(vt,sb,0);
+		else
+			sb.append("Union");
+		sb.append(" {\n");
+		if(getMbody() != null)
+			getMbody().TypeChecking(vt,sb,t+1);
+		sb.append(getIndent(t)).append(" }\n");
+	}
+	public void FParam.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t) {
+		//FParam ::= Param:VarDecl*;
+		for(int i=0;i<getNumParam();i++){
+			getParam(i).TypeChecking(vt,sb,t);
+			if(i != (getNumParam()-1))
+				sb.append(",");
+		}
+	}
+	
+	public void Mbody.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t) {
+		//Mbody ::= Body:Blockstmt*;
+		sb.append("\n");
+		for (Blockstmt bs : getBodyList()) {
+			bs.TypeChecking(vt,sb, t);
+			sb.append("\n");
+		}
+		sb.append("\n");
+	}
+	
+	
+	public void Block.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t) {
+		/*Block ::= BlockS:Blockstmt*;*/
+		sb.append("\n").append(getIndent(t)).append("{\n");
+		for (Blockstmt bs : getBlockSs()) {
+			bs.TypeChecking(vt,sb,t+1);
+			sb.append("\n");
+		}
+		sb.append(getIndent(t)).append("}\n");
+	}
+	
+	abstract void Blockstmt.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t); /*abstract Blockstmt;*/
+
+	public void AssignS.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*AssignS:Blockstmt 	::= LabelAST:Label <VarName:String> Expression;*/
+		sb.append(getIndent(t)).append(getVarName()).append(" "+getOpType()+" ");
+		getExpression().TypeChecking(vt,sb,0);
+		sb.append(";");
+		this.FV(vt);
+		this.typeInference(vt,sb,getVarName(),getExpression().expType(vt));
+	}
+	public void IfS.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;*/
+		sb.append(getIndent(t)).append("if ");
+		getConditionExp().TypeChecking(vt,sb,t);
+		sb.append("\n").append(getIndent(t));
+		getB1().TypeChecking(vt,sb,t);
+		sb.append("\n").append(getIndent(t)).append("else");
+		getB2().TypeChecking(vt,sb,t);
+	}
+	public void WhileS.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*WhileS:Blockstmt 	::= ConditionExp:LExp Block;*/
+		sb.append(getIndent(t)).append("while");
+		getConditionExp().TypeChecking(vt,sb,t);
+		sb.append("\n").append(getIndent(t));
+		getBlock().TypeChecking(vt,sb,t);
+	}
+	public void VarDecl.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*VarDecl:Blockstmt 	::= LabelAST:Label <Varm> <VarName> Type:VarType;*/
+		sb.append(getIndent(t));
+		if(!getVarm().isEmpty())
+			sb.append(getVarm());
+		else
+			sb.append("val");
+		sb.append(" ").append(getVarName());
+		sb.append(":");
+		getType().TypeChecking(vt,sb,0);
+		sb.append(";");
+		this.FV(vt);
+		this.typeInference(vt,sb,getVarName(),Type.Unknown);
+	}
+	public void VarDef.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*VarDef:Blockstmt	::= LabelAST:Label <Varm> <VarName> Type:VarType Expression;*/
+		sb.append(getIndent(t));
+		sb.append(getVarm());
+		sb.append(" ").append(getVarName());
+		sb.append(":");
+		getType().TypeChecking(vt,sb,0);
+		sb.append(" = ");
+		getExpression().TypeChecking(vt,sb,0);
+		sb.append(";");
+		this.FV(vt);
+		this.typeInference(vt,sb,getVarName(),getExpression().expType(vt)); /*define in BlockCell.jadd*/
+	}
+	
+	/*
+	 * Define Expression TypeChecking Function
+	 */
+	abstract void Expression.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t); /*abstract Expression;*/
+	
+	public void VarRefExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*VarRefExp:Expression 	::= <Contents>;*/
+		sb.append(getIndent(t)).append(getContents());
+		this.FV(vt);
+	}
+	public void NumLitExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*NumLitExp:Expression 	::= <Contents>;*/
+		sb.append(getIndent(t)).append(getContents());
+	}
+	public void BoolLitExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*BoolLitExp:Expression  	::= <Contents>;*/
+		sb.append(getIndent(t)).append(getContents());
+	}
+	public void NotExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*NotExp:Expression 		::= Expression;*/
+		sb.append(getIndent(t)).append("!(");
+		getExpression().TypeChecking(vt,sb,0);
+		sb.append(")");
+	}
+	public void LExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*LExp:Expression 		::= LabelAST:Label Expression;*/
+		sb.append(getIndent(0));
+		if(getExpression().getClass().getName().equals("AST.AExp")||
+				getExpression().getClass().getName().equals("AST.RExp")||
+				getExpression().getClass().getName().equals("AST.BExp")||
+				getExpression().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getExpression().TypeChecking(vt,sb,0);
+		if(getExpression().getClass().getName().equals("AST.AExp")||
+				getExpression().getClass().getName().equals("AST.RExp")||
+				getExpression().getClass().getName().equals("AST.BExp")||
+				getExpression().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		String tmp = getExpression().getClass().getName();
+		Type newType = getExpression().expType(vt);
+		sb.append(" /*");
+		if(tmp.equals("AST.AExp"))
+		{
+			sb.append("Type Error:The expression should be Relational Expression, rather than Arithmetic Expression");	
+		}
+		if(tmp.equals("AST.BExp"))
+		{
+			if((newType == Type.Unknown)||(newType == Type.Error))
+				sb.append("Type Error: Because the Boolean expression is "+newType);
+			else
+				sb.append("Type Normal:");
+		}
+		if(tmp.equals("AST.RExp"))
+		{
+			if((newType == Type.Unknown)||(newType == Type.Error))
+				sb.append("Type Error: Because the Relational expression is "+newType);
+			else
+				sb.append("Type Normal:");
+		}
+		if(tmp.equals("AST.NotExp"))
+		{
+			if((newType == Type.Unknown)||(newType == Type.Error))
+				sb.append("Type Error: Because the not expression is "+newType);
+			else
+				sb.append("Type Normal:");	
+		}
+		
+		if(tmp.equals("AST.VarRefExp"))
+		{
+			sb.append("Type Error: because the variables should not be as conditional expression");	
+		}
+		
+		if(tmp.equals("AST.NumLitExp"))
+		{
+			sb.append("Type Error: because the number should not be as conditional expression");		
+		}
+		
+		if(tmp.equals("AST.BoolLitExp"))
+		{
+			sb.append("Type Normal:");		
+		}
+		sb.append("*/\n");
+	}
+	public void AExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression;*/
+		sb.append(getIndent(t));
+		
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getLeft().TypeChecking(vt,sb,0);
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		sb.append(" ");
+		getOp().TypeChecking(vt,sb,0);
+		sb.append(" ");
+		
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getRight().TypeChecking(vt,sb,0);
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+	}
+	public void RExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression;*/
+		sb.append(getIndent(t));
+		
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getLeft().TypeChecking(vt,sb,0);
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		sb.append(" ");
+		getOp().TypeChecking(vt,sb,0);
+		sb.append(" ");
+		
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		
+		getRight().TypeChecking(vt,sb,0);
+		
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+	}
+	public void BExp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression;*/
+		sb.append(getIndent(t));
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getLeft().TypeChecking(vt,sb,0);
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		sb.append(" ");
+		getOp().TypeChecking(vt,sb,0);
+		sb.append(" ");
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getRight().TypeChecking(vt,sb,t);
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+	}
+	
+	/*
+	 *Define Op TypeChecking function
+ 
+	 *abstract Op ::= <Contents>;
+	 *Op_b : Op;
+	 *Op_r : Op;
+	 *Op_a : Op;
+	*/
+	public void Op.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		sb.append(getIndent(t)).append(getContents());
+	}
+	/*
+	 *Define Label TypeChecking function
+	 */
+	abstract void Label.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t); /*abstract Label;;*/
+	public void VarType.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*VarType:Label  	::= <KeyWord>;*/
+		sb.append(getIndent(t)).append(getKeyWord());
+	}
+	public void NumLabel.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*NumLabel:Label 	::= <Num>;*/
+		sb.append(getIndent(t)).append(getNum());
+	}
+	public void ClassProp.TypeChecking(Map<String,Type> vt, StringBuilder sb,int t){
+		/*ClassProp:Label  	::= <KeyWord>;*/
+		sb.append(getIndent(t)).append(getKeyWord());
+	}
+}

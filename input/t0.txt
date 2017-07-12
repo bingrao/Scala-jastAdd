@@ -1,0 +1,19 @@
+public Class test0{
+
+	x = 9;
+	y = 9;
+	x = 7;
+	if(x>y)
+	{
+		x = 6;
+	}
+	else
+	{
+		y =8;
+		while(z>y)
+		{
+			x = 9;
+			y = 10;
+		}
+	}
+}

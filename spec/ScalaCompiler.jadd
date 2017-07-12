@@ -1,0 +1,42 @@
+import AST.*;
+import java.io.*;
+/**
+ * @author Bing
+ * Define a Driver to parse a file from the local file system and return Program
+ */
+aspect ScalaCompiler {
+
+	public class ScalaCompiler{
+		private String path;
+		public ScalaCompiler(String input){
+			this.path = input;
+		}
+		public Program run(){
+			Program p = null;
+			
+			File file = new File(path);
+	    	if(!file.exists()) {
+	    		System.err.println("error (PrettyPrint) : file does not exist");
+	    		System.exit(1);
+	    	}
+	    	
+	    	System.out.println("file : " + path);
+			try {
+				ScalaParser parser = new ScalaParser();
+				Reader reader = new FileReader(path);
+		    	ScalaScanner scanner = new ScalaScanner(new BufferedReader(reader));
+		    	p = (Program)parser.parse(scanner);
+		    	reader.close();
+			}catch (IOException e) {
+				System.err.println("error (PrettyPrint) : " + e.getMessage());
+				e.printStackTrace();
+			} catch (beaver.Parser.Exception e) {
+				System.err.println("error (PrettyPrint) : " + e.getMessage());
+				e.printStackTrace();
+			}finally{
+				return p;
+			}
+		}
+	}
+
+}

@@ -1,0 +1,39 @@
+import java.util.Collection;
+import java.util.ArrayList;
+
+/**
+ * @author Bing
+ * ASTNode is the root father of all AST Class node
+ */
+aspect ASTNode {
+	public void ASTNode.printAST()
+	{
+		StringBuilder sb = new StringBuilder();
+		printAST(sb);
+		System.out.println("The AST Tree is:\n"+sb.toString());
+	}
+	public void ASTNode.printAST(StringBuilder sb) {
+		printAST(sb, 0);
+	}
+	public void ASTNode.printAST(StringBuilder sb, int t) {
+		for (int j = 0; j < t; j++) {
+			sb.append((j%2==0) ? " |" : " !");
+		}
+		sb.append(getClass().getName() + "\n");
+		for (int i = 0; i < getNumChild(); i++) {
+			getChild(i).printAST(sb, t+1);
+		}
+	}
+	syn String ASTNode.getIndent(int t);
+	eq  ASTNode.getIndent(int t){
+		String s = "";
+		for (int i = 0; i < t; i++) {
+			s += "\t";
+		}
+		return s;
+	}
+	/*add an error msg associated with a certain context*/
+	protected void ASTNode.error(Collection c, String s) {
+    	c.add(s);
+  	}
+}

@@ -1,0 +1,280 @@
+import java.util.*;
+import utility.SetRepUtility;
+import utility.FlowGraph;
+/**																		 | -- AssignS
+ * @author Bing														     | -- WhileS					
+ * Program-|-Class-----| -Properties:Blockstmt* -------------------------| -- IfS
+ * 		   |  *	   	   |												 | -- VarDecl
+ * 		   |-Class     | 												 | -- VarDef
+ * 	       |  *		   | 															
+ * 		   |-Class	   | -Methods:Function* ---|--Function
+ * 		    								   |-- *
+ * 											   |--Function ---|--FParam:VarDecl*
+ * 															  |--Mbody:Blockstmt*
+ * 	
+ * In order to simplfy programming, a program consists of classes and a class contains 
+ * 
+ * 
+ * Properties and Methods two parts which are two different separated parts in a program.			
+ * Based on WHILE project, I define inFlows(), next() and outFlows() to represent
+ * the control flow of a block statement.
+ * inFlows(): 
+ * next():
+ * outFlows():
+ * 
+ * 
+ * Here we assume there is only one part of Properties and various Methods, what's more they
+ * are separated.
+ * 
+ * The information will be printed in the printAST()
+ * 
+ */
+aspect ScalaCFlows {
+	/** Flows into a block.*/
+	inh Set<NumLabel> Blockstmt.inFlows();
+	
+	/**The initial inFlows of Properities is null*/
+	syn Set<NumLabel> Properties.inFlows() = new HashSet<NumLabel>();
+	eq Properties.getPropS(int index).inFlows() {
+		if(index == 0)
+			return this.inFlows();
+		else
+			return getPropS(index-1).finals(); 
+	}
+	/**The initial inFlows of Function is null*/
+	syn Set<NumLabel> Function.inFlows() = new HashSet<NumLabel>();
+	
+	/**The initial inFlows of formal parameters is the inFlows of Function*/
+	eq Function.getFParam().inFlows() = this.inFlows();
+	inh Set<NumLabel> FParam.inFlows();
+	eq FParam.getParam(int index).inFlows(){
+		if(index == 0)
+			return inFlows();
+		else
+			return getParam(index-1).finals();
+	}
+	/**The initial inFlows of Function body is the inFlows of Function*/
+	eq Function.getMbody().inFlows() = this.inFlows();
+	inh Set<NumLabel> Mbody.inFlows();
+	eq Mbody.getBody(int index).inFlows() {
+		if(index == 0)
+			return inFlows();
+		else
+			return getBody(index-1).finals(); 
+	}
+	
+	eq Block.getBlockS(int index).inFlows() {
+		if(index == 0)
+			return inFlows();
+		else
+			return getBlockS(index-1).finals(); 
+	}
+	
+	inh Set<NumLabel> Block.inFlows();
+	eq IfS.getB1().inFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.add(getConditionExp().getLabelAST());
+		return ret;
+	}
+	eq IfS.getB2().inFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.add(getConditionExp().getLabelAST());
+		return ret;
+	}
+	eq WhileS.getBlock().inFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.add(getConditionExp().getLabelAST());
+		return ret;
+	}
+	inh Set<NumLabel> LExp.inFlows();
+	eq IfS.getConditionExp().inFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.addAll(this.inFlows());
+		return ret;
+	}
+	eq WhileS.getConditionExp().inFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.addAll(this.inFlows());
+		ret.addAll(getBlock().finals());
+		return ret;
+	}
+	
+	/** the next statement of current statment*/
+	inh Blockstmt Blockstmt.next();
+	
+	/**Because the Propertis part and Methods part are separated
+	 * So the next of Propertis is null*/
+	syn Blockstmt Properties.next() = null;
+	eq Properties.getPropS(int i).next(){
+		if(i == getNumPropS() - 1)
+			return this.next();
+		else
+			return getPropS(i+1);
+	}
+	/**The next() of last formal parameter point to the fisrt statement of function body*/
+	eq Function.getFParam().next() = getMbody().getBody(0);
+	inh Blockstmt FParam.next();
+	eq FParam.getParam(int i).next(){
+		if(i == getNumParam()-1)
+			return this.next();
+		else
+			return getParam(i+1);
+	}
+	/**The next() of Function body is null*/
+	syn Blockstmt Mbody.next() = null;
+	eq Mbody.getBody(int i).next(){
+		if(i == getNumBody() - 1)
+			return this.next();
+		else
+			return getBody(i+1);
+	}
+	
+	
+	inh Blockstmt Block.next();
+	eq IfS.getB1().next() = this.next();
+	eq IfS.getB2().next() = this.next();
+	eq WhileS.getBlock().next() = this;
+	inh Blockstmt LExp.next();
+	eq IfS.getConditionExp().next()= this.next();
+	eq WhileS.getConditionExp().next() = this.next();
+	
+	eq Block.getBlockS(int i).next(){
+		if(i == getNumBlockS() - 1)
+			return this.next();
+		else
+			return getBlockS(i+1);
+	}
+
+	
+	/**outFlows of the current statement*/
+	inh Set<NumLabel> Blockstmt.outFlows();
+	
+	eq Properties.getPropS(int i).outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		if(i == getNumPropS()-1)
+		{
+			if(next() != null)
+				ret.add(next().init());
+			else
+				ret.add(new NumLabel("0"));
+		}
+		else
+			ret.add(getPropS(i+1).init());
+		
+		return ret;
+	}
+	
+	eq FParam.getParam(int i).outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		if(i == getNumParam()-1)
+		{	
+			if(next() != null)
+				ret.add(next().init());
+			else
+				ret.add(new NumLabel("0"));
+		}
+		else
+			ret.add(getParam(i+1).init());
+		
+		return ret;
+	}
+	
+	eq Mbody.getBody(int i).outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		if(i == getNumBody()-1){
+			if(next() != null)
+				ret.add(next().init());
+			else
+				ret.add(new NumLabel("0"));
+		}
+		else
+			ret.add(getBody(i+1).init());
+		
+		return ret;
+	}
+	
+	eq Block.getBlockS(int i).outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		if(i == (getNumBlockS()-1))
+		{	
+			if(next() != null)
+				ret.add(next().init());
+			else
+				ret.add(new NumLabel("0"));
+		}	
+		else
+		{
+			ret.add(getBlockS(i+1).init());
+		}	
+		
+		return ret;
+	}
+	inh Set<NumLabel> Block.outFlows();
+	eq IfS.getB1().outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		if(next() != null)
+			ret.add(next().init());
+		else
+			ret.add(new NumLabel("0"));
+		return ret;
+	}
+	eq IfS.getB2().outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		if(next() != null)
+			ret.add(next().init());
+		else
+			ret.add(new NumLabel("0"));
+		return ret;
+	}
+	eq WhileS.getBlock().outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.add(getConditionExp().getLabelAST());
+		return ret;
+	}
+	inh Set<NumLabel> LExp.outFlows();
+	eq IfS.getConditionExp().outFlows(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.add(getB1().init());
+		ret.add(getB2().init());
+		return ret;
+	}
+	eq WhileS.getConditionExp().outFlows() = this.outFlows();
+	
+	
+	/**Print the In/out Flows information of a blockstmt*/
+	public void Blockstmt.printInOutLabels(StringBuilder sb, int t){
+		sb.append(" inFlows: ");
+		Set<NumLabel> tmp = this.inFlows();
+		Iterator<NumLabel> it = tmp.iterator();
+		while(it.hasNext())
+		{
+			sb.append(it.next().getNum()).append(" ");
+		}
+		sb.append(" outFlows: ");
+		tmp = this.outFlows();
+		it = tmp.iterator();
+		while(it.hasNext())
+		{
+			sb.append(it.next().getNum()).append(" ");
+		}
+	}
+	
+	/**Print in/out flow information of a lexp expression*/
+	public void LExp.printInOutLabels(StringBuilder sb, int t){
+		sb.append(" ").append(getIndent(0)).append("inFlows: ");
+		Set<NumLabel> tmp = this.inFlows();
+		Iterator<NumLabel> it = tmp.iterator();
+		while(it.hasNext())
+		{
+			sb.append(it.next().getNum()).append(" ");
+		}
+		sb.append(", outFlows: ");
+		tmp = this.outFlows();
+		it = tmp.iterator();
+		while(it.hasNext())
+		{
+			sb.append(it.next().getNum()).append(" ");
+		}
+		sb.append(",");
+	}
+}

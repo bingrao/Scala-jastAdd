@@ -1,0 +1,85 @@
+import java.util.Map;
+import utility.Pair;
+import utility.SetRepUtility;
+import AST.*;
+
+aspect LV {
+	/** The kill function for live variables. */
+	syn Set<String> BlockCell.killLV();
+	eq AssignS.killLV() {
+		Set<String> ret = new HashSet<String>();
+		ret.add(getVarName());
+		return ret;
+    }
+	eq VarDef.killLV() {
+		Set<String> ret = new HashSet<String>();
+		ret.add(getVarName());
+		return ret;
+    }
+	eq VarDecl.killLV() = new HashSet<String>();
+	eq LExp.killLV() = new HashSet<String>();
+	
+	/** The gen function for live variables. */
+	syn Set<String> BlockCell.genLV();
+	eq AssignS.genLV() {
+		Set<String> ret = new HashSet<String>();
+		ret.addAll(getExpression().FV().keySet());
+		if(!getOpType().equals("=")){
+			ret.add(getVarName());
+		}
+		return ret;
+	}
+	eq VarDef.genLV() = getExpression().FV().keySet();
+	eq VarDecl.genLV() = FV().keySet();
+	eq LExp.genLV() = FV().keySet();
+				
+	/** Compute the entry information for the LV analysis. */
+	syn Set<String> BlockCell.LVentry() circular [new HashSet<String>()];
+    eq BlockCell.LVentry() {
+		Set<String> ret = new HashSet<String>(); // start with a fresh set!
+		ret.addAll(this.LVexit());
+		ret.removeAll(this.killLV());
+		ret.addAll(this.genLV());		
+		return ret;
+	}
+	
+	/** Compute the exit information for the LV analysis. */
+	syn Set<String> BlockCell.LVexit() circular [new HashSet<String>()];
+    eq BlockCell.LVexit() {
+		Set<String> ret = new HashSet<String>();		
+		if (this.progAST().finals().contains(getLabelAST())) {
+			; // use the empty set, which is already in ret
+		} else {
+			for (NumLabel lprime : outFlows()) {
+				BlockCell b = lprime.itsBlockCell();
+				ret.addAll(b.LVentry());
+			}
+		}
+		return ret;
+	}
+	/**Print the entry and exit information*/
+	public void BlockCell.printLV(StringBuilder sb, int t){
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");
+		//this.printStateLabel(sb,t);
+		//this.printInOutLabels(sb,t);
+		NumLabel l = getLabelAST();
+		sb.append(" ").append(getIndent(0)).append("LVentry("+l.getNum()+"): ");
+		Object[] tmp = this.LVentry().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			String res = (String)tmp[i];
+			sb.append("("+res+") ");
+			
+		}
+		
+		sb.append(" ").append("LVexit("+l.getNum()+"): ");
+		tmp = this.LVexit().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			String res = (String)tmp[i];
+			sb.append("("+res+") ");
+		}
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");	
+	}
+	
+}

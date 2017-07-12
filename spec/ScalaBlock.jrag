@@ -1,0 +1,124 @@
+/**
+ *@author Bing
+ * transverse  AST to gather the basic block info
+ */
+aspect ScalaBlock{
+		public void Program.printBlocks(){
+			Set<BlockCell> ret = this.blocks();
+			System.out.println("###########The block set of this program:");
+			Iterator<BlockCell> it = ret.iterator();
+			while(it.hasNext()){
+				System.out.println("#"+it.next().unParseBlocks());
+			}
+		}
+		/**
+		 * Gather the blocks information of a program*/
+	    syn Set<BlockCell> Program.blocks(){
+	    	/**Program ::= Member:Class*;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	for(Class m : getMemberList()){
+	    		ret.addAll(m.blocks());
+	    	}
+	    	return ret;
+	    }
+	    
+	    syn Set<BlockCell> Class.blocks(){
+	    	/**Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;	*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	if(getProperties() != null)
+				ret.addAll(getProperties().blocks());
+			if(getMethods() != null)
+			{
+				/**Because we are focus on intraprocedural analysis rather than interprocedural analysis
+				 * so for now we will not consider the analysis of methods*/
+				//ret.addAll(getMethods().blocks());
+			}
+			return ret;
+	    }
+	    
+	    syn Set<BlockCell> Properties.blocks(){
+	    	/**Properties ::= PropS:Blockstmt*;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	for (Blockstmt bs : getPropSList())
+	    		ret.addAll(bs.blocks());
+	    	return ret;
+	    }
+	    
+	    syn Set<BlockCell> Methods.blocks()
+	    {
+	    	/**Methods  ::= Funcs:Function*;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	for(Function f : getFuncsList()){
+	    		ret.addAll(f.blocks());
+	    	}
+	    	return ret;
+	    }
+	    syn Set<BlockCell> Function.blocks(){
+	    	/**Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	if(getFParam() != null)
+				ret.addAll(getFParam().blocks());
+			if(getMbody() != null)
+				ret.addAll(getMbody().blocks());
+			return ret;
+	    }
+	    syn Set<BlockCell> FParam.blocks(){
+	    	/**FParam ::= Param:VarDecl*;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	for(VarDecl p : getParamList())
+	    		ret.addAll(p.blocks());
+	    	return ret;
+	    }
+	    syn Set<BlockCell> Mbody.blocks(){
+	    	/**Mbody ::= Body:Blockstmt*;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	for (Blockstmt bs : getBodyList()) {
+	    		ret.addAll(bs.blocks());
+	    	}
+	    	return ret;
+	    }	
+
+	    syn Set<BlockCell> Block.blocks();
+	    eq Block.blocks(){
+	    	/**Block ::= BlockS:Blockstmt*;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	for (Blockstmt bs : getBlockSs()) {
+	    		ret.addAll(bs.blocks());
+	    	}
+	    	return ret;
+	    }
+	    syn Set<BlockCell> Blockstmt.blocks();
+	    eq AssignS.blocks() {
+	    	/**AssignS:Blockstmt 	::= LabelAST:NumLabel <VarName:String> Expression;*/
+	    	Set<BlockCell> res = new HashSet<BlockCell>();
+	    	res.add(this);
+	    	return res;
+	    }
+	    eq IfS.blocks() {
+	    	/**IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	ret.addAll(getB1().blocks());
+	    	ret.addAll(getB2().blocks());
+	    	ret.add(getConditionExp());
+	    	return ret;
+	    }
+	    eq WhileS.blocks() {
+	    	/**WhileS:Blockstmt 	::= ConditionExp:LExp Block;*/
+	    	Set<BlockCell> ret = new HashSet<BlockCell>();
+	    	ret.addAll(getBlock().blocks());
+	    	ret.add(getConditionExp());
+	    	return ret;
+	    }
+	    eq VarDecl.blocks() {
+	    	/**VarDecl:Blockstmt 	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType;*/
+	    	Set<BlockCell> res = new HashSet<BlockCell>();
+	    	res.add(this);
+	    	return res;
+	    }
+	    eq VarDef.blocks() {
+	    	/**VarDef:Blockstmt	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType Expression;*/
+	    	Set<BlockCell> res = new HashSet<BlockCell>();
+	    	res.add(this);
+	    	return res;
+	    }
+}

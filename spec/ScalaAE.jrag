@@ -1,0 +1,140 @@
+import java.util.*;
+import AST.*;
+
+/**The Available Expressions Analysis.*/
+aspect AE {
+	/* The kill function for available expressions. */
+	syn Set<Expression> BlockCell.killAE(Set<Expression> current);
+	
+	eq AssignS.killAE(Set<Expression> current) {
+		Set<Expression> ret = new HashSet<Expression>();
+		/*The Variable will be change*/
+		String assigned_var = getVarName();
+		for (Expression exp : current)
+		{
+			if (exp.FV().containsKey(assigned_var))
+			{
+				/*Becauase other expressions contain this var, so the value of 
+				 * current variable changed, the whole value of expression will change
+				 * too, which means this expression is killed*/
+				ret.add(exp);
+			}
+		}
+		if(!getOpType().equals("=")){
+    		/**
+    		 *if this assignment is combound assignment, for example "x +=6; ==> x = x+6"
+    		 *In this situation, we should add expression "x+6" to the set.
+    		 */
+    		Expression tmp = new AExp(new VarRefExp(getVarName()),
+    								  new Op_a(getOpType().replace("=","")),
+    								  getExpression());
+    		ret.add(tmp);
+    	}
+		return ret;
+	}
+	eq VarDef.killAE(Set<Expression> current) {
+		Set<Expression> ret = new HashSet<Expression>();
+		String assigned_var = getVarName();
+		for (Expression exp : current)
+		{
+			if (exp.FV().containsKey(assigned_var))
+			ret.add(exp);
+		}
+		return ret;
+	
+	}
+	eq VarDecl.killAE(Set<Expression> current) = new HashSet<Expression>();
+	eq LExp.killAE(Set<Expression> current) = new HashSet<Expression>();
+	
+	/*The gen function for available expressions.*/
+	syn Set<Expression> BlockCell.genAE();
+	eq AssignS.genAE() {
+		Set<Expression> ret = new HashSet<Expression>();
+		Expression exp = getExpression();
+		if (exp.nontrivial() && !(exp.FV().containsKey(getVarName()))) {
+			ret.add(exp);
+		}
+		return ret;
+	}
+	
+	eq VarDef.genAE() {
+		Set<Expression> ret = new HashSet<Expression>();
+		Expression exp = getExpression();
+		if (exp.nontrivial()) {
+			ret.add(exp);
+		}
+		return ret;
+	}
+	eq VarDecl.genAE() = new HashSet<Expression>();/*null*/
+	
+	eq LExp.genAE() {
+		Set<Expression> tmp = this.Aexps();
+		Iterator<Expression> it = tmp.iterator();
+		while(it.hasNext()){
+			Expression e = it.next();
+			if (e.nontrivial() == false) {
+				tmp.remove(e);
+			}
+		}
+		return tmp;
+	}
+	
+	/*Compute the entry information for the AE analysis.*/
+	syn Set<Expression> BlockCell.AEentry() circular [AexpStar()];
+    eq BlockCell.AEentry() {
+		Set<Expression> ret = new HashSet<Expression>(); 
+		if (getLabelAST().equals(progInitLabel())) {
+			ret = new HashSet<Expression>();
+		} else {
+			Set<Set<Expression>> inputs = SetRepUtility.map(
+				new SetRepUtility.Fun<NumLabel, Set<Expression>>() {
+					public Set<Expression> run(NumLabel l) {
+						BlockCell b = l.itsBlockCell();
+						return b.AEexit();
+					}
+				}, 
+				inFlows());
+			ret = SetRepUtility.intersect(inputs);
+		}
+		return ret;
+	}
+    
+	/*Compute the exit information for the AE analysis.*/
+	syn Set<Expression> BlockCell.AEexit() circular [AexpStar()];
+	eq BlockCell.AEexit() {
+		Set<Expression> ret = new HashSet<Expression>();
+		ret.addAll(this.AEentry());
+		ret.removeAll(this.killAE(ret));
+		ret.addAll(this.genAE());		
+		return ret;
+	}
+	
+	
+	/**Print the entry and exit information*/
+	public void BlockCell.printAE(StringBuilder sb, int t){
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");
+		//this.printStateLabel(sb,t);
+		//this.printInOutLabels(sb,t);
+		
+		NumLabel l = getLabelAST();
+		sb.append(" ").append(getIndent(0)).append("AEentry("+l.getNum()+"): ");
+		Object[] tmp = this.AEentry().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			Expression res = (Expression)tmp[i];
+			sb.append("("+res.unParse()+") ");
+			
+		}
+		
+		sb.append(" ").append("AEexit("+l.getNum()+"): ");
+		tmp = this.AEexit().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			Expression res = (Expression)tmp[i];
+			sb.append("("+res.unParse()+") ");
+		}
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");
+			
+	}
+		
+}

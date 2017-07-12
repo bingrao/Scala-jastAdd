@@ -1,0 +1,187 @@
+import java.util.*;
+import AST.*;
+
+/**
+ * @author Bing
+ * Attributes for non-trivial arithmetic expressions.
+ * 
+ * Reference:
+ * 1. WHILE Language jastadd project; 
+ * 2. Principles of Program Analysis, section 2.1.1. Nielsen, Nielsen, and Hankin
+ */
+aspect ScalaExpr {
+	
+    public void Program.printAexps()
+    {
+    	Set<Expression> ret = this.Aexps();
+    	Iterator<Expression> it = ret.iterator();
+    	System.out.println("############The Non-triviial Expression: ");
+    	while(it.hasNext()){
+    		System.out.println("#: "+it.next().unParse());
+    	}
+    }
+    /** The set of non-trivial arithmetic expressions in a statement. */
+    syn Set<Expression> Program.Aexps(){
+    	//Program ::= Member:Class*;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	for(Class m : getMemberList()){
+    		ret.addAll(m.Aexps());
+    	}
+    	return ret;
+    }
+    
+    syn Set<Expression> Class.Aexps(){
+    	//Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;	
+    	Set<Expression> ret = new HashSet<Expression>();
+    	if(getProperties() != null)
+			ret.addAll(getProperties().Aexps());
+		if(getMethods() != null){
+			/**Because we are focus on intraprocedural analysis rather than interprocedural analysis
+			 * so for now we will not consider the analysis of methods*/
+			//ret.addAll(getMethods().Aexps());
+		}
+		return ret;
+    }
+    
+    syn Set<Expression> Properties.Aexps(){
+    	//Properties ::= PropS:Blockstmt*;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	for (Blockstmt bs : getPropSList())
+    		ret.addAll(bs.Aexps());
+    	return ret;
+    }
+    
+    syn Set<Expression> Methods.Aexps()
+    {
+    	//Methods  ::= Funcs:Function*;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	for(Function f : getFuncsList()){
+    		ret.addAll(f.Aexps());
+    	}
+    	return ret;
+    }
+    syn Set<Expression> Function.Aexps(){
+    	//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	if(getFParam() != null)
+			ret.addAll(getFParam().Aexps());
+		if(getMbody() != null)
+			ret.addAll(getMbody().Aexps());
+		return ret;
+    }
+    syn Set<Expression> FParam.Aexps(){
+    	//FParam ::= Param:VarDecl*;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	for(VarDecl p : getParamList())
+    		ret.addAll(p.Aexps());
+    	return ret;
+    }
+    syn Set<Expression> Mbody.Aexps(){
+    	//Mbody ::= Body:Blockstmt*;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	for (Blockstmt bs : getBodyList()) {
+    		ret.addAll(bs.Aexps());
+    	}
+    	return ret;
+    }
+    syn Set<Expression> Block.Aexps();
+    eq Block.Aexps(){
+    	//Block ::= BlockS:Blockstmt*;
+    	Set<Expression> ret = new HashSet<Expression>();
+    	for (Blockstmt bs : getBlockSs()) {
+    		ret.addAll(bs.Aexps());
+    	}
+    	return ret;
+    }
+    syn Set<Expression> Blockstmt.Aexps();
+    
+    //AssignS:Blockstmt 	::= LabelAST:NumLabel <VarName:String> Expression;
+    eq AssignS.Aexps() {
+    	Set<Expression> ret = getExpression().Aexps();
+    	if(!getOpType().equals("=")){
+    		/**x +=6; ==> x = x+6*/
+    		Expression tmp = new AExp(new VarRefExp(getVarName()),
+    								  new Op_a(getOpType().replace("=","")),
+    								  getExpression());
+    		ret.add(tmp);
+    	}
+    	return ret;
+    }
+    eq IfS.Aexps() {
+    	//IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;
+          Set<Expression> ret = getConditionExp().Aexps();
+          ret.addAll(getB1().Aexps());
+          ret.addAll(getB2().Aexps());
+          return ret;
+       }
+    eq WhileS.Aexps() {
+    	//WhileS:Blockstmt 	::= ConditionExp:LExp Block;
+          Set<Expression> ret = getConditionExp().Aexps();
+          ret.addAll(getBlock().Aexps());
+          return ret;
+       }
+    //VarDecl:Blockstmt 	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType;
+    eq VarDecl.Aexps() = new HashSet<Expression>();
+    
+    //VarDef:Blockstmt	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType Expression;
+    eq VarDef.Aexps() = getExpression().Aexps();
+    	
+ 
+    
+    /** The set of non-trivial arithmetic expressions in an expression. */
+    syn Set<Expression> Expression.Aexps();
+    eq VarRefExp.Aexps() = new HashSet<Expression>(); //VarRefExp:Expression 	::= <Contents>;
+    eq NumLitExp.Aexps() = new HashSet<Expression>(); //NumLitExp:Expression 	::= <Contents>; 
+    eq NotExp.Aexps() = getExpression().Aexps(); //NotExp:Expression 		::= Expression;
+    eq AExp.Aexps() {
+    	//AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression; 
+          Set<Expression> ret = new HashSet<Expression>();
+          
+          ret.add(this);
+          ret.addAll(getLeft().Aexps());
+          ret.addAll(getRight().Aexps());
+          return ret;
+       }
+  //BoolLitExp:Expression  	::= <Contents>;
+    eq BoolLitExp.Aexps() = new HashSet<Expression>();
+    eq BExp.Aexps() {
+    	//BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression;
+          Set<Expression> ret = new HashSet<Expression>();
+          ret.addAll(getLeft().Aexps());
+          ret.addAll(getRight().Aexps());
+          return ret;
+       }
+    eq RExp.Aexps() {
+    	//RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression;
+          Set<Expression> ret = new HashSet<Expression>();
+          ret.addAll(getLeft().Aexps());
+          ret.addAll(getRight().Aexps());
+          return ret;
+       }
+    //LExp:Expression 		::= LabelAST:NumLabel Expression;
+    eq LExp.Aexps() = getExpression().Aexps();
+
+    /** The set of non-trivial expressions in the program. */                              
+    // the following are needed so that Exprs can be hashed...
+    /** Are these Exprs equal? */
+    public boolean Expression.equals(Object oth) {
+       if (oth == null || !(oth instanceof Expression)) { return false; }
+       Expression e = (Expression) oth;
+       return unParse().equals(e.unParse());
+    }
+    /** Return the hash code for this Expression. */
+    public int Expression.hashCode() {
+       return unParse().hashCode();
+    }
+    
+    /** Is this expression a non-trivial arithmetic expression? */
+    syn boolean Expression.nontrivial();
+    eq VarRefExp.nontrivial() = false; /* x = y;*/
+    eq NumLitExp.nontrivial() = false; /* x = 3;*/
+    eq BoolLitExp.nontrivial() = false; /*x = true*/
+    eq NotExp.nontrivial() = getExpression().nontrivial();
+    eq AExp.nontrivial() = true;
+    eq RExp.nontrivial() = getLeft().nontrivial()||getRight().nontrivial();
+    eq BExp.nontrivial() = getLeft().nontrivial()||getRight().nontrivial();
+    eq LExp.nontrivial() = getExpression().nontrivial();
+}

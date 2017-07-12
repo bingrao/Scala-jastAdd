@@ -1,0 +1,299 @@
+/**
+ * @author Bing
+ * Collect the varialbes of the Program.
+ * Here I use  Map<String,Type> to represent the information a variable
+ * String: the name of a variable
+ * Type:   the type information of a varialbe (Type.Unknown, Type.Error, Type.Int, Type.Bool), More details in Utility.Type
+ * 
+ * 
+ * During collection those variables,based on the type of expressions, I do some basic type checking.
+ */
+import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+import utility.SetRepUtility;
+import utility.Type;
+aspect ScalaFV {
+	/*
+	 * Define Statement FV Function
+	 */
+
+	/*Program ::= Block;*/
+	public void Program.FV(Map<String,Type> sb) {
+		//Program ::= Member:Class*;
+		for(Class m : getMemberList()){
+			m.FV(sb);
+		}
+	}
+	public void Class.FV(Map<String,Type> sb){
+		//Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;	
+		if(getProperties() != null)
+			getProperties().FV(sb);
+		
+		if(getMethods() != null){
+			/**Because we are focus on intraprocedural analysis rather than interprocedural analysis
+			 * so for now we will not consider the analysis of methods*/
+			//getMethods().FV(sb);
+		}
+	}
+	public void Properties.FV(Map<String,Type> sb) {
+		//Properties ::= PropS:Blockstmt*;
+		for (Blockstmt bs : getPropSList()) {
+			bs.FV(sb);
+		}
+	} 
+	public void Methods.FV(Map<String,Type> sb) {
+		//Methods  ::= Funcs:Function*;
+		for(Function f : getFuncsList()){
+			f.FV(sb);
+		}
+	}
+	public void Function.FV(Map<String,Type> sb) {
+		//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+		if(getFParam() != null)
+			getFParam().FV(sb);
+
+		if(getMbody() != null)
+			getMbody().FV(sb);
+
+	}
+	public void FParam.FV(Map<String,Type> sb) {
+		//FParam ::= Param:VarDecl*;
+		/**Because the factor paramters is not as the Free variables*/
+		/*
+		for(int i=0;i<getNumParam();i++){
+			getParam(i).FV(sb);
+		}
+		*/
+	}
+	
+	public void Mbody.FV(Map<String,Type> sb) {
+		//Mbody ::= Body:Blockstmt*;
+		for (Blockstmt bs : getBodyList()) {
+			bs.FV(sb);
+		}
+	}
+	
+	public void Block.FV(Map<String,Type> sb) {
+		/*Block ::= BlockS:Blockstmt*;*/
+		for (Blockstmt bs : getBlockSs()) {
+			bs.FV(sb);
+		}
+	}
+	abstract void Blockstmt.FV(Map<String,Type> sb); /*abstract Blockstmt;*/
+	public void AssignS.FV(Map<String,Type> sb){
+		/*AssignS:Blockstmt 	::= LabelAST:Label <VarName:String> Expression;*/
+		Type newType = getExpression().expType(sb);
+		if(sb.containsKey(getVarName()) == true){
+			Type oldType = sb.get(getVarName());
+			if(newType != oldType)
+			{
+				if((oldType == Type.Unknown)&&(newType != Type.Error))
+				{
+					sb.put(getVarName(),newType);
+				}
+			}
+		}else{
+			/*if the type is not in FV,and add*/
+			if(newType == Type.Error)
+				sb.put(getVarName(),Type.Unknown);
+			else
+				sb.put(getVarName(),newType);
+		}
+		getExpression().FV(sb);
+	}
+	public void IfS.FV(Map<String,Type> sb){
+		/*IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;*/
+		getConditionExp().FV(sb);
+		getB1().FV(sb);
+		getB2().FV(sb);
+	}
+	public void WhileS.FV(Map<String,Type> sb){
+		/*WhileS:Blockstmt 	::= ConditionExp:LExp Block;*/
+		getConditionExp().FV(sb);
+		getBlock().FV(sb);
+	}
+	public void VarDecl.FV(Map<String,Type> sb){
+		/*VarDecl:Blockstmt 	::= LabelAST:Label <Varm> <VarName> Type:VarType;*/
+		Type newType = Type.getType(getType().unParse());
+		if(sb.containsKey(getVarName()) == true){
+			Type oldType = sb.get(getVarName());
+			if(newType != oldType)
+			{
+				if((oldType == Type.Unknown)&&(newType != Type.Error))
+				{
+					sb.put(getVarName(),newType);
+				}
+			}
+		}else{
+			/*if the type is not in FV,and add*/
+			if(newType == Type.Error)
+				sb.put(getVarName(),Type.Unknown);
+			else
+				sb.put(getVarName(),newType);
+		}
+	}
+	public void VarDef.FV(Map<String,Type> sb){
+		/*VarDef:Blockstmt	::= LabelAST:Label <Varm> <VarName> Type:VarType Expression;*/
+		Type newType = Type.getType(getType().unParse());
+		if(sb.containsKey(getVarName()) == true){
+			Type oldType = sb.get(getVarName());
+			if(newType != oldType)
+			{
+				if((oldType == Type.Unknown)&&(newType != Type.Error))
+				{
+					sb.put(getVarName(),newType);
+				}
+			}
+		}else{
+			/*if the type is not in FV,and add*/
+			if(newType == Type.Error)
+				sb.put(getVarName(),Type.Unknown);
+			else
+				sb.put(getVarName(),newType);
+		}
+	}
+	
+	/*
+	 * Define Expression FV Function
+	 */
+	abstract void Expression.FV(Map<String,Type> sb); /*abstract Expression;*/
+	public void VarRefExp.FV(Map<String,Type> sb){
+		/*VarRefExp:Expression 	::= <Contents>;*/
+		if(sb.containsKey(getContents())== false)
+			sb.put(getContents(),this.expType(sb));
+		return;
+	}
+	public void NumLitExp.FV(Map<String,Type> sb){
+		/*NumLitExp:Expression 	::= <Contents>;*/
+		return;
+	}
+	public void BoolLitExp.FV(Map<String,Type> sb){
+		/*BoolLitExp:Expression  	::= <Contents>;  x = true/false*/
+		return;
+	}
+	public void NotExp.FV(Map<String,Type> sb){
+		/*NotExp:Expression 		::= Expression;*/
+		getExpression().FV(sb);
+	}
+	public void LExp.FV(Map<String,Type> sb){
+		/*LExp:Expression 		::= LabelAST:Label Expression;*/
+		getExpression().FV(sb);
+	}
+	public void AExp.FV(Map<String,Type> sb){
+		/*AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression;*/
+		getLeft().FV(sb);
+		getOp().FV(sb);
+		getRight().FV(sb);
+	}
+	public void RExp.FV(Map<String,Type> sb){
+		/*RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression;*/
+		getLeft().FV(sb);
+		getOp().FV(sb);
+		getRight().FV(sb);
+	}
+	public void BExp.FV(Map<String,Type> sb){
+		/*BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression;*/
+		getLeft().FV(sb);
+		getOp().FV(sb);
+		getRight().FV(sb);
+	}
+	
+	/*
+	 *Define Op FV function
+	 *abstract Op ::= <Contents>;
+	 *Op_b : Op;
+	 *Op_r : Op;
+	 *Op_a : Op;
+	*/
+	public void Op.FV(Map<String,Type> sb){
+		return;
+	}
+	/*
+	 *Define Label FV function
+	 */
+	abstract void Label.FV(Map<String,Type> sb); /*abstract Label;;*/
+	public void VarType.FV(Map<String,Type> sb){
+		/*VarType:Label  	::= <KeyWord>;*/
+		return;
+	}
+	public void NumLabel.FV(Map<String,Type> sb){
+		/*NumLabel:Label 	::= <Num>;*/
+		return;
+	}
+	public void ClassProp.FV(Map<String,Type> sb){
+		/*ClassProp:Label  	::= <KeyWord>;*/
+		return;
+	}
+	
+	/**
+	 * 
+	 */
+	
+	public void Program.printFV()
+	{
+		Map<String,Type> res = this.FV();
+		Iterator<Map.Entry<String, Type>> it = res.entrySet().iterator();
+		System.out.println("##############The variable info:");
+		System.out.println("\nVariable"+"\t \t"+"TypeInfo");
+		while(it.hasNext())
+		{
+			Map.Entry<String,Type> var = it.next();
+			System.out.println(var.getKey()+"\t\t-\t"+var.getValue().getName());
+		}
+	}
+	syn Map<String,Type> Program.FV() {
+		/*Program ::= Block;*/
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	syn Map<String,Type> Class.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	syn Map<String,Type> Properties.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	syn Map<String,Type> Methods.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	syn Map<String,Type> Function.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	syn Map<String,Type> FParam.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	
+	syn Map<String,Type> Mbody.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	
+	syn Map<String,Type> Block.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	
+	syn Map<String,Type> Blockstmt.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+	syn Map<String,Type> Expression.FV(){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		return sb;
+	}
+}

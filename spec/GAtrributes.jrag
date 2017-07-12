@@ -1,0 +1,93 @@
+import java.util.*;
+import AST.*;
+import utility.Type;
+import AST.*;
+aspect GAttributes {
+	/**
+	 * @author Bing
+	 * Here I define some global variables, which means children 
+	 * can get specific value from their root parent.
+	 * More details about AST hierarchy please see ScalaCFlows.jrag
+	 */
+	 
+	 
+	/**Broadcast progLabels (Lab*) to all children in a program*/
+	eq Properties.getPropS(int i).progLabels() = this.labels();
+	eq Mbody.getBody(int i).progLabels() = this.labels();
+	eq FParam.getParam(int i).progLabels() = this.labels();
+	inh Set<NumLabel> BlockCell.progLabels();
+	
+	/**Broadcast progInitLabel (init(S*)) to all children of the program.*/
+	/*
+	eq IfS.getConditionExp().progInitLabel() = this.init();
+	eq WhileS.getConditionExp().progInitLabel() = this.init();
+	eq AssignS.getExpression().progInitLabel() = this.init();
+	eq VarDef.getExpression().progInitLabel() = this.init();
+	eq Block.getBlockS(int i).progInitLabel() = this.init();
+	 */
+	eq Properties.getPropS(int i).progInitLabel() = this.init();
+	eq Mbody.getBody(int i).progInitLabel() = this.init();
+	eq FParam.getParam(int i).progInitLabel() = this.init();
+	inh NumLabel BlockCell.progInitLabel();
+	
+	/*Broadcast progFinals (final(S*)) to all children of the closet parents*/
+	/*	
+	eq IfS.getConditionExp().progFinals() = this.finals();
+	eq WhileS.getConditionExp().progFinals() = this.finals();
+	eq AssignS.getExpression().progFinals() = this.finals();
+	eq VarDef.getExpression().progFinals() = this.finals();
+	eq Block.getBlockS(int i).progFinals() = this.finals();
+	 */
+	eq Properties.getPropS(int i).progFinals() = this.finals();
+	eq Mbody.getBody(int i).progFinals() = this.finals();
+	eq FParam.getParam(int i).progFinals() = this.finals();
+	inh Set<NumLabel> BlockCell.progFinals();
+	
+	/*Broadcast progFV (FV(S*)) to all children in the closet parents*/	
+	/*
+	eq IfS.getConditionExp().progFV() = this.FV();
+	eq WhileS.getConditionExp().progFV() = this.FV();
+	eq AssignS.getExpression().progFV() = this.FV();
+	eq VarDef.getExpression().progFV() = this.FV();
+	eq Block.getBlockS(int i).progFV() = this.FV();
+	 */
+	eq Properties.getPropS(int i).progFV() = this.FV();
+	eq Mbody.getBody(int i).progFV() = this.FV();
+	eq FParam.getParam(int i).progFV() = this.FV();
+	inh Map<String,Type> BlockCell.progFV();
+	
+	/*Broadcast progCFG to all children in the program.*/
+	/*
+	eq IfS.getConditionExp().progCFG() = this.flows();
+	eq WhileS.getConditionExp().progCFG() = this.flows();
+	eq AssignS.getExpression().progCFG() = this.flows();
+	eq VarDef.getExpression().progCFG() = this.flows();
+	eq Block.getBlockS(int i).progCFG() = this.flows();
+	 */
+	eq Properties.getPropS(int i).progCFG() = this.flows();
+	eq Mbody.getBody(int i).progCFG() = this.flows();
+	eq FParam.getParam(int i).progCFG() = this.flows();
+	inh ArrayList<Map<NumLabel,NumLabel>> BlockCell.progCFG();
+	
+	/*Broadcast progAST to all children in the program*/
+	
+	syn Program Program.progAST() = this;
+	eq Program.getMember(int i).progAST() = this.progAST();/*Program ::= Member:Class*;*/
+	inh Program Properties.progAST();
+	inh Program Mbody.progAST();
+	inh Program FParam.progAST();
+	
+	eq Properties.getPropS(int i).progAST() = this.progAST();
+	eq Mbody.getBody(int i).progAST() = this.progAST();
+	eq FParam.getParam(int i).progAST() = this.progAST();
+	
+	inh Program BlockCell.progAST();
+	
+	/*Broadcast AexpStar() to all children in the program*/
+    eq Properties.getPropS(int i).AexpStar() = this.Aexps();
+	eq Mbody.getBody(int i).AexpStar() = this.Aexps();
+	eq FParam.getParam(int i).AexpStar() = this.Aexps();
+	inh Set<Expression> BlockCell.AexpStar();
+	
+	inh Set<Expression> Expression.AexpStar();
+}

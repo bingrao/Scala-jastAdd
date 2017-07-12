@@ -1,0 +1,20 @@
+public Class test2{
+	var x:Int = a+5;
+	y = 7;
+	while(y>z)
+	{
+		if(z>100)
+		{
+			x = 5;
+			y = a+c;
+		}
+		else
+		{
+			z = 6;
+			a = a+1;
+		}	
+	}
+	w = true;
+	h = 5 || 8;
+	s = x;
+}

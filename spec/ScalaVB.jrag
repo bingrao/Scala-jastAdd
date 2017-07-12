@@ -1,0 +1,113 @@
+import java.util.Set;
+import utility.Pair;
+import utility.SetRepUtility;
+import AST.*;
+
+/** The Very Busy Expressions Analysis.
+    See Nielsen, Nielsen, and Hankin,
+    Principles of Program Analysis, section 2.1.3
+    */
+aspect ScalaVB {
+       /** The kill function for very busy expressions. */
+    syn Set<Expression> BlockCell.killVB(Set<Expression> current);
+    eq AssignS.killVB(Set<Expression> current) {
+		Set<Expression> ret = new HashSet<Expression>();
+		String assigned_var = getVarName();
+		for (Expression exp : current)
+		{
+			if (exp.FV().containsKey(assigned_var)){
+				ret.add(exp);
+			}	
+		}
+		if(!getOpType().equals("=")){
+    		/**x +=6; ==> x = x+6*/
+    		Expression tmp = new AExp(new VarRefExp(getVarName()),
+    								  new Op_a(getOpType().replace("=","")),
+    								  getExpression());
+    		ret.add(tmp);
+    	}
+		return ret;
+	}
+    eq VarDef.killVB(Set<Expression> current) {
+		Set<Expression> ret = new HashSet<Expression>();
+		String assigned_var = getVarName();
+		for (Expression exp : current)
+		{
+			if (exp.FV().containsKey(assigned_var)) 
+			ret.add(exp);
+		}
+		return ret;
+	}
+	eq VarDecl.killVB(Set<Expression> current) = new HashSet<Expression>();
+	eq LExp.killVB(Set<Expression> current) =  new HashSet<Expression>();
+  
+	/** The gen function for very busy expressions. */
+	syn Set<Expression> BlockCell.genVB();
+	eq AssignS.genVB(){
+		Set<Expression> ret = getExpression().Aexps();
+		if(!getOpType().equals("=")){
+    		/**x +=6; ==> x = x+6*/
+    		Expression tmp = new AExp(new VarRefExp(getVarName()),
+    								  new Op_a(getOpType().replace("=","")),
+    								  getExpression());
+    		ret.add(tmp);
+    	}
+    	return ret;
+	}
+	
+	eq VarDef.genVB() = getExpression().Aexps();
+	eq VarDecl.genVB() = new HashSet<Expression>();
+	eq LExp.genVB() = this.Aexps();
+	
+	/** Compute the exit information for the VB analysis. */	
+	syn Set<Expression> BlockCell.VBexit() circular [AexpStar()];
+    eq BlockCell.VBexit() {
+		Set<Expression> ret = new HashSet<Expression>(); // a fresh set!
+		if (!progFinals().contains(getLabelAST())) {
+		   boolean started = false;
+		   for (NumLabel lab : this.outFlows()) {
+		       if (!started) {
+		           	ret.addAll(lab.itsBlockCell().VBentry());
+			   		started = true;
+		       } else {
+		           	ret.retainAll(lab.itsBlockCell().VBentry());
+		       }
+           }
+		}
+		return ret;
+	}
+	/** Compute the entry information for the VB analysis. */
+	syn Set<Expression> BlockCell.VBentry() circular [AexpStar()];
+    eq BlockCell.VBentry() {
+	    Set<Expression> ret = new HashSet<Expression>();
+		ret.addAll(this.VBexit());
+		ret.removeAll(this.killVB(ret));
+		ret.addAll(this.genVB());
+		return ret;
+	}
+	/**Print the entry and exit information*/
+	public void BlockCell.printVB(StringBuilder sb, int t){
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");
+		//this.printStateLabel(sb,t);
+		//this.printInOutLabels(sb,t);
+		NumLabel l = getLabelAST();
+		sb.append(" ").append(getIndent(0)).append("VBentry("+l.getNum()+"): ");
+		Object[] tmp = this.VBentry().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			Expression res = (Expression)tmp[i];
+			sb.append("("+res.unParse()+") ");
+			
+		}
+		
+		sb.append(" ").append("VBexit("+l.getNum()+"): ");
+		tmp = this.VBexit().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			Expression res = (Expression)tmp[i];
+			sb.append("("+res.unParse()+") ");
+		}
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");	
+	}
+	    
+}

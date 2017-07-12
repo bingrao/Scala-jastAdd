@@ -1,0 +1,77 @@
+Program ::= Member:Class*; /*a  program may consist of many classes*/
+/**
+ * a class consist of two parts
+ *** Filed: Using "Properties" keyword to represent fileds of a class
+ *** Method: Using "Methods" kewword to represent methods of a class
+ */
+Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;	
+
+/**
+ * Properties consist of a  series of Blockstmts;
+ */
+Properties ::= PropS:Blockstmt*;
+
+/**There are a lot of functions which we call method in this project in a scala class*/
+Methods  ::= Funcs:Function*;
+
+/**
+ * A function format: 
+ *funcName(formal parameter...):ReturnType {
+ *	body of a function 				
+ *}
+ */
+Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+
+FParam ::= Param:VarDecl*;
+
+/*a main body of a function consist of a series of Blockstmt*/
+Mbody ::= Body:Blockstmt*;
+
+/*Define a set of Statements as a program block*/
+Block ::= BlockS:Blockstmt*;
+
+abstract Blockstmt;
+
+/*Multiple statement*/
+AssignS:Blockstmt 	::= LabelAST:NumLabel <VarName:String> <OpType:String> Expression; /*a = 3; a += 3;*/
+IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;
+WhileS:Blockstmt 	::= ConditionExp:LExp Block;
+
+/*Declare Statement*/
+VarDecl:Blockstmt 	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType;			/* Declare a Variable, like val x:Integer;*/
+VarDef:Blockstmt	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType Expression;	/* define a variable, like val x:Integer = 3*/
+
+/*Operation*/
+abstract Op ::= <Contents>;
+Op_b : Op;	/*Boolean Operation*/
+Op_r : Op;	/*Relational Operations*/
+Op_a : Op;	/*Arithmetic Operations*/
+
+/*Expression*/
+abstract Expression;
+
+/*basic expression*/
+VarRefExp:Expression 	::= <Contents>; /* x = y*/
+NumLitExp:Expression 	::= <Contents>; /* x = 3*/
+BoolLitExp:Expression  	::= <Contents>; /* x = true/false(just only)*/
+
+/*combound expression*/
+NotExp:Expression 		::= Expression; 					/* x = ~(...)*/
+LExp:Expression 		::= LabelAST:NumLabel Expression;	/*Label Expression which is used in while or if condition part*/
+AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression; /*Arithmetic Expression*/
+RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression; /*Relational Expression*/
+BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression; /*Boolean expression*/
+
+
+abstract Label;
+
+/*Identify the type info of variables, rather than label any statement
+ *it is easier to encode parse specification
+ */
+VarType:Label  	::= <KeyWord>;
+
+/*Identify the access modifiers of a class, rather than label a class*/
+ClassProp:Label ::= <KeyWord>;
+
+/*Label System to identify a statement to use represent the flow of a program*/
+NumLabel:Label 	::= <Num>;

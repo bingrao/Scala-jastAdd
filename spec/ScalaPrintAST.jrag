@@ -1,0 +1,295 @@
+/**
+ * @author Bing
+ * 
+ * print the info of AST
+ */
+
+aspect ScalaPrintAST {
+	/*
+	 * Define Statement prettyPrint Function
+	 */
+	public void Program.printAST(){
+		/*Program ::= Member:Class*;*/
+		StringBuilder sb = new StringBuilder();
+		sb.append("Normal Analysis").append("\n");
+		for(Class m : getMemberList()){
+			m.prettyPrint(sb, 0);
+			sb.append("\n");
+		}
+		System.out.println("###############The AST Tree is:\n"+sb.toString());
+	}
+	
+	public void Class.prettyPrint(StringBuilder sb, int t){
+		/*Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;*/
+		getClassType().prettyPrint(sb,t);
+		sb.append(" ClassName{").append(getClassName()).append("} {\n");
+		
+		if(getProperties() != null)
+			getProperties().prettyPrint(sb,t);
+		else
+			sb.append("\tNo Properties\n");
+		
+		if(getMethods() != null)
+			getMethods().prettyPrint(sb,t);
+		else
+			sb.append("\tNo Methods\n");
+		
+		sb.append(getIndent(t)).append("}\n");
+	}
+	public void Properties.prettyPrint(StringBuilder sb, int t) {
+		/*Properties ::= PropS:Blockstmt*;*/
+		
+		for (Blockstmt bs : getPropSList()) {
+			bs.prettyPrint(sb, t+1);
+			sb.append("\n");
+		}
+	} 
+	public void Methods.prettyPrint(StringBuilder sb, int t) {
+		//Methods  ::= Funcs:Function*;
+		sb.append("\n");
+		for(Function f : getFuncsList()){
+			f.prettyPrint(sb,t+1);
+			sb.append("\n");	
+		}
+		sb.append("\n");
+	}
+	public void Function.prettyPrint(StringBuilder sb, int t) {
+		//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+		sb.append(getIndent(t)).append("def ").append(getFuncName()).append("(");
+		if(getFParam() != null)
+			getFParam().prettyPrint(sb,0);
+		sb.append(") : ");
+		if(getReturnType() != null)
+			getReturnType().prettyPrint(sb,0);
+		else
+			sb.append("Union");
+		sb.append(" {\n");
+		if(getMbody() != null)
+			getMbody().prettyPrint(sb,t+1);
+		sb.append(getIndent(t)).append(" }\n");
+	}
+	public void FParam.prettyPrint(StringBuilder sb, int t) {
+		//FParam ::= Param:VarDecl*;
+		for(int i=0;i<getNumParam();i++){
+			getParam(i).prettyPrint(sb,t);
+			if(i != (getNumParam()-1))
+				sb.append(",");
+		}
+	}
+	
+	public void Mbody.prettyPrint(StringBuilder sb, int t) {
+		//Mbody ::= Body:Blockstmt*;
+		sb.append("\n");
+		for (Blockstmt bs : getBodyList()) {
+			bs.prettyPrint(sb, t);
+			sb.append("\n");
+		}
+		sb.append("\n");
+	}
+	
+	public void Block.prettyPrint(StringBuilder sb, int t) {
+		/*Block ::= BlockS:Blockstmt*;*/
+		sb.append("\n").append(getIndent(t)).append("{\n");
+		for (Blockstmt bs : getBlockSs()) {
+			bs.prettyPrint(sb, t+1);
+		}
+		sb.append(getIndent(t)).append("}\n");
+	}
+	
+	abstract void Blockstmt.prettyPrint(StringBuilder sb, int t); /*abstract Blockstmt;*/
+	
+	public void AssignS.prettyPrint(StringBuilder sb, int t){
+		/*AssignS:Blockstmt 	::= LabelAST:Label <VarName:String> Expression;*/
+		sb.append(getIndent(t)).append("AssignS:{");
+		getLabelAST().prettyPrint(sb,0);
+		sb.append(", ={");
+		
+		sb.append("VarName:").append(getVarName()).append(",");
+		
+		if(!getOpType().equals("=")){
+			sb.append(getOpType().replace("=","")).append("{");
+			sb.append(getVarName()).append(",");
+			getExpression().prettyPrint(sb,0);
+			sb.append("}");
+		}else{
+			getExpression().prettyPrint(sb,0);
+		}
+		sb.append("}").append("}").append("\n");
+		this.printAnalysis(sb,t);
+	}
+	public void IfS.prettyPrint(StringBuilder sb, int t){
+		/*IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;*/
+		sb.append(getIndent(t)).append("IfS: ");
+		getConditionExp().prettyPrint(sb,t);
+		sb.append("\n").append(getIndent(t)).append("True: ");
+		if(getB1() != null)
+			getB1().prettyPrint(sb,t);
+		sb.append("\n").append(getIndent(t)).append("False: ");
+		if(getB2() != null)
+			getB2().prettyPrint(sb,t);
+		sb.append("\n");
+	}
+	public void WhileS.prettyPrint(StringBuilder sb, int t){
+		/*WhileS:Blockstmt 	::= ConditionExp:LExp Block;*/
+		sb.append(getIndent(t)).append("WhileS: ");
+		getConditionExp().prettyPrint(sb,t);
+		sb.append("\n").append(getIndent(t)).append("Block: ");
+		if(getBlock()!=null)
+			getBlock().prettyPrint(sb,t);
+		sb.append("\n");
+	}
+	public void VarDecl.prettyPrint(StringBuilder sb, int t){
+		/*VarDecl:Blockstmt 	::= LabelAST:Label <Varm> <VarName> Type:VarType;*/
+		
+		sb.append(getIndent(t)).append("VarDec:{");
+		getLabelAST().prettyPrint(sb,0);
+		if(!getVarm().isEmpty())
+			sb.append(", ").append("Varm:").append(getVarm());
+		else
+			sb.append(", ").append("Varm:").append("val");
+		sb.append(", ").append("VarName: ").append(getVarName());
+		sb.append(", ");
+		getType().prettyPrint(sb,0);
+		sb.append("}");
+		sb.append("\n");
+		this.printAnalysis(sb,t);
+	}
+	public void VarDef.prettyPrint(StringBuilder sb, int t){
+		/*VarDef:Blockstmt	::= LabelAST:Label <Varm> <VarName> Type:VarType Expression;*/
+		sb.append(getIndent(t)).append("VarDef:{ ");
+		getLabelAST().prettyPrint(sb,0);
+		sb.append(", ").append("Varm: ").append(getVarm());
+		sb.append(", ").append("VarName: ").append(getVarName());
+		sb.append(", ");
+		getType().prettyPrint(sb,0);
+		sb.append(", ");
+		getExpression().prettyPrint(sb,0);
+		sb.append("}");
+		sb.append("\n");
+		this.printAnalysis(sb,t);
+	}
+	
+	/*
+	 * Define Expression prettyPrint Function
+	 */
+	abstract void Expression.prettyPrint(StringBuilder sb, int t); /*abstract Expression;*/
+	
+	public void VarRefExp.prettyPrint(StringBuilder sb, int t){
+		/*VarRefExp:Expression 	::= <Contents>;*/
+		sb.append(getIndent(t)).append("VarRefExp:{").append(getContents()).append("}");
+	}
+	public void NumLitExp.prettyPrint(StringBuilder sb, int t){
+		/*NumLitExp:Expression 	::= <Contents>;*/
+		sb.append(getIndent(t)).append("NumLitExp:{").append(getContents()).append("}");
+	}
+	public void BoolLitExp.prettyPrint(StringBuilder sb, int t){
+		/*BoolLitExp:Expression  	::= <Contents>;*/
+		sb.append(getIndent(t)).append("BoolLitExp:{").append(getContents()).append("}");
+	}
+	public void NotExp.prettyPrint(StringBuilder sb, int t){
+		/*NotExp:Expression 		::= Expression;*/
+		sb.append(getIndent(t)).append("NotExp:!{");
+		getExpression().prettyPrint(sb,0);
+		sb.append(" }");
+	}
+	public void LExp.prettyPrint(StringBuilder sb, int t){
+		/*LExp:Expression 		::= LabelAST:Label Expression;*/
+		sb.append(getIndent(0)).append("LExp:{");
+		getLabelAST().prettyPrint(sb,0);
+		sb.append(", ");
+		getExpression().prettyPrint(sb,0);
+		sb.append(" }");
+		this.printAnalysis(sb,t);
+	}
+	public void AExp.prettyPrint(StringBuilder sb, int t){
+		/*AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression;*/
+		sb.append(getIndent(t)).append("AExp:{");
+		getLeft().prettyPrint(sb,0);
+		sb.append(", ");
+		getOp().prettyPrint(sb,0);
+		sb.append(", ");
+		getRight().prettyPrint(sb,0);
+		sb.append(" }");
+	}
+	public void RExp.prettyPrint(StringBuilder sb, int t){
+		/*RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression;*/
+		sb.append(getIndent(t)).append("RExp:{");
+		getLeft().prettyPrint(sb,0);
+		sb.append(", ");
+		getOp().prettyPrint(sb,0);
+		sb.append(", ");
+		getRight().prettyPrint(sb,0);
+		sb.append(" }");
+	}
+	public void BExp.prettyPrint(StringBuilder sb, int t){
+		/*BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression;*/
+		sb.append(getIndent(t)).append("BExp:{");
+		getLeft().prettyPrint(sb,0);
+		sb.append(", ");
+		getOp().prettyPrint(sb,0);
+		sb.append(", ");
+		getRight().prettyPrint(sb,t);
+		sb.append(" }");
+	}
+	
+	/*
+	 *Define Op prettyPrint function
+	 */
+	abstract void Op.prettyPrint(StringBuilder sb, int t); /*abstract Op ::= <Contents>;*/
+	
+	public void Op_b.prettyPrint(StringBuilder sb, int t){
+		/*Op_b : Op;*/
+		sb.append(getIndent(t)).append("Op_b:{").append(getContents()).append("}");
+	}
+	public void Op_r.prettyPrint(StringBuilder sb, int t){
+		/*Op_r : Op;*/
+		sb.append(getIndent(t)).append("Op_r:{").append(getContents()).append("}");
+	}
+	public void Op_a.prettyPrint(StringBuilder sb, int t){
+		/*Op_a : Op;*/
+		sb.append(getIndent(t)).append("Op_a:{").append(getContents()).append("}");
+	}
+	
+	/*
+	 *Define Label prettyPrint function
+	 */
+	abstract void Label.prettyPrint(StringBuilder sb, int t); /*abstract Label;;*/
+	public String Label.prettyPrint()
+	{
+		StringBuilder sb = new StringBuilder();
+		this.prettyPrint(sb,0);
+		return sb.toString();
+		
+	}
+	public void VarType.prettyPrint(StringBuilder sb, int t){
+		/*VarType:Label  	::= <KeyWord>;*/
+		sb.append(getIndent(t)).append("VarType:{").append(getKeyWord()).append("}");
+	}
+	public void ClassProp.prettyPrint(StringBuilder sb, int t){
+		/*ClassProp:Label ::= <KeyWord>;*/
+		sb.append(getIndent(t)).append("ClassType:{").append(getKeyWord()).append("}");
+	}
+	public void NumLabel.prettyPrint(StringBuilder sb, int t){
+		/*NumLabel:Label 	::= <Num>;*/
+		sb.append(getIndent(t)).append("NumLabel:{").append(getNum()).append("}");
+	}
+	
+	syn String Blockstmt.prettyPrint();
+	eq Blockstmt.prettyPrint(){
+		StringBuilder sb = new StringBuilder();
+		this.prettyPrint(sb,0);
+		return sb.toString();	
+	}
+	syn String Expression.prettyPrint();
+	eq Expression.prettyPrint(){
+		StringBuilder sb = new StringBuilder();
+		this.prettyPrint(sb,0);
+		return sb.toString();
+	}
+	syn String Op.prettyPrint();
+	eq Op.prettyPrint(){
+		StringBuilder sb = new StringBuilder();
+		this.prettyPrint(sb,0);
+		return sb.toString();
+	}
+}

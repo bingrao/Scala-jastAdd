@@ -1,0 +1,42 @@
+import java.util.*;
+import utility.Pair;
+import AST.*;
+import utility.AnalysisType;
+aspect ScalaPrintAnalysis{
+
+	/*
+	 * Define gatherInfo Function to print the dat flow analysis results
+	 */
+	public void Program.printAnalysisResult(AnalysisType aType){
+		/*Program ::= Member:Class*;*/
+		StringBuilder sb = new StringBuilder();
+		switch(aType.getValue()){
+			case 1:
+			{
+				sb.append("Available Expressions Analysis");
+			}break;
+			case 2:
+			{
+				sb.append("Reaching Definitions Analysis");
+			}break;
+			case 3:
+			{	
+				sb.append("VeryBusy Expressions Analysis");
+			}break;
+			case 4:
+			{
+				sb.append("Live Variables Analysis");
+			}break;
+			default :
+			{
+				sb.append("Normal Analysis");
+			}
+		}
+		sb.append("\n");
+		for(Class m : getMemberList()){
+			m.unParse(sb, 0);
+			sb.append("\n");
+		}
+		System.out.println("############The data flow analysis result:\n"+sb.toString());
+	}
+}

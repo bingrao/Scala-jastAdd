@@ -1,0 +1,236 @@
+%header	{: 
+	package AST; 
+	import java.io.*;
+ 	import utility.LabelUtility;
+:};	/*this code is inlined in the generated parser class*/
+
+%embed 	{: 
+  /** Syntax error exceptions. */
+  public class ParseException extends RuntimeException {
+  	public ParseException(String msg) { super(msg); }
+  }
+  /** Error handling adapter for using Beaver from JastAdd. */
+  class Events extends Parser.Events {
+    public void syntaxError(Symbol token) {
+      StringBuffer s = new StringBuffer();
+      s.append("line: " + token.getLine(token.getStart()) + " char: " + token.getColumn(token.getStart()) + "\n");
+      s.append("  *** Syntactic error: unexpected token " + Terminals.NAMES[token.getId()]);
+      throw new ParseException(s.toString());
+    }
+    public void scannerError(Scanner.Exception e) {
+      StringBuffer s = new StringBuffer();
+      s.append("line: " + e.line + " char: " + e.column + "\n");
+      s.append("  *** Lexical error: " + e.getMessage());
+      throw new ParseException(s.toString());
+    }
+  }
+  { LabelUtility.reset(); 
+    report = new Events(); // Use error handler in parser
+  }
+:};/*this code is inlined in the generated parser class*/
+
+
+%goal goal;
+
+/*define a program goal*/
+Program goal = classList   			 {: return new Program(classList);	:};
+
+/*a list of class*/
+List classList =
+    	mem                          {: return new List().add(mem); :}
+  	| 	classList  mem  		  	 {: return classList.add(mem); :}
+  	;
+/**define various formats of a class*/
+Class mem = 
+		classType CLASS   IDENTIFIER.className LBRACE RBRACE 					{: return new Class(classType,className,null,null); :}		
+	|	classType CLASS   IDENTIFIER.className LBRACE propList RBRACE 			{: return new Class(classType,className,propList,null); :}
+	|	classType CLASS   IDENTIFIER.className LBRACE funcList RBRACE 			{: return new Class(classType,className,null,funcList); :}
+	|	classType CLASS   IDENTIFIER.className LBRACE propList funcList RBRACE  {: return new Class(classType,className,propList,funcList); :}
+	|	classType OBJECT  IDENTIFIER.className LBRACE RBRACE 					{: return new Class(classType,className,null,null); :}		
+	|	classType OBJECT  IDENTIFIER.className LBRACE propList RBRACE 			{: return new Class(classType,className,propList,null); :}
+	|	classType OBJECT  IDENTIFIER.className LBRACE funcList RBRACE 			{: return new Class(classType,className,null,funcList); :}
+	|	classType OBJECT  IDENTIFIER.className LBRACE propList funcList RBRACE 	{: return new Class(classType,className,propList,funcList); :}
+	;
+/**Use the Properties list to represent the fields of a class*/
+Properties propList = 
+		blockStmtList 	{:	return new Properties(blockStmtList);	:}	
+	;
+/*the list of methods*/
+Methods funcList = 
+		fList 			{:	return new Methods(fList);	:}
+	;
+/*the list of functions*/
+List fList =
+    	func                          	{: return new List().add(func); :}
+  	| 	fList  func  		  	   		{: return fList.add(func); :}
+  	;
+/*
+ *Define various format of a function
+ *def f(var x:Int):Int {x=3;}
+ *def f(var x:Int) {x=3;}
+ */  	
+Function func = 
+	    DEF IDENTIFIER.funName LPAREN params RPAREN COLON varType.returnType LBRACE bodyList.b RBRACE {: return new Function(funName,params,returnType,b); :}
+	|   DEF IDENTIFIER.funName LPAREN params RPAREN  LBRACE bodyList.b RBRACE {: return new Function(funName,params,null,b); :}
+	;
+/*the list of formal parameters*/
+FParam params = 
+		paramList 		{:	return new FParam(paramList);	:}
+	|					{:	return null;	:}	
+	;
+List paramList =
+    	param                          		{: return new List().add(param); :}
+  	| 	paramList COMMA param  		  	   	{: return paramList.add(param); :}
+  	; 
+/*define a formal parameter with different formats*/
+VarDecl param =
+		VAR IDENTIFIER COLON varType.type					{:	return new VarDecl(new NumLabel(LabelUtility.nextLabel()),VAR,IDENTIFIER,type);	 :}	/*Declare a variable as var*/
+	|	VAL IDENTIFIER COLON varType.type					{:	return new VarDecl(new NumLabel(LabelUtility.nextLabel()),VAL,IDENTIFIER,type);	 :}	/*Declare a variable as val*/
+	|	IDENTIFIER COLON varType.type						{:	return new VarDecl(new NumLabel(LabelUtility.nextLabel()),null,IDENTIFIER,type); :} /*Declare a variable as val*/
+	;
+/*define main body of a function*/
+Mbody bodyList = 
+		blockStmtList 	{:	return new Mbody(blockStmtList);	:}
+	|					{:	return null;	:}	
+	;
+/*Define a block which contains a lot of statements*/	
+Block block = 
+		LBRACE blockStmtList RBRACE {: return new Block(blockStmtList); :}
+  	|	LBRACE	RBRACE				{: return null;		:}
+  	;  	
+List blockStmtList =
+    	stmt                          		{: return new List().add(stmt); :}
+  	| 	blockStmtList stmt  		  	{: return blockStmtList.add(stmt); :}
+  	;
+  	
+ /*
+  *a block of statements, which consist of:
+  ***assignment statement,
+  ***ifelse statement,
+  ***while statement,
+  ***vardecl statement,
+  ***vardef statement
+  */ 	
+Blockstmt stmt = 
+		assigns.a		{:	return a;	:}
+	|	ifs.i			{:	return i;	:}
+	|	whiles.w		{:	return w;	:}	
+	|	vardecl.l		{:	return l;	:}
+	|	vardef.f		{:	return f;	:}
+	;
+
+/*Various format assignment statement*/
+AssignS	assigns = 	
+		IDENTIFIER EQ expression.e SEMICOLON				{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, EQ,e); :} 			/* x = expression*/
+	|	IDENTIFIER PLUSEQ expression.e SEMICOLON			{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, PLUSEQ,e); :}		/* x += expression*/ 
+	|	IDENTIFIER MINUSEQ expression.e SEMICOLON			{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, MINUSEQ,e); :}		/* x -= expression*/
+	|	IDENTIFIER MULTEQ expression.e SEMICOLON			{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, MULTEQ,e); :}		/* x *= expression*/	
+	|	IDENTIFIER DIVEQ expression.e SEMICOLON				{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, DIVEQ,e); :}		/* x /= expression*/	
+	|	IDENTIFIER ANDEQ expression.e SEMICOLON				{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, ANDEQ,e); :}		/* x &= expression*/	
+	|	IDENTIFIER OREQ expression.e SEMICOLON				{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, OREQ,e); :}		/* x |= expression*/	
+	|	IDENTIFIER XOREQ expression.e SEMICOLON				{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, XOREQ,e); :}		/* x ^= expression*/
+	|	IDENTIFIER MODEQ expression.e SEMICOLON				{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, MODEQ,e); :}		/* x %= expression*/
+	|	IDENTIFIER LSHIFTEQ expression.e SEMICOLON			{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, LSHIFTEQ,e); :}	/* x >>= expression*/	
+	|	IDENTIFIER RSHIFTEQ expression.e SEMICOLON			{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, RSHIFTEQ,e); :}	/* x <<= expression*/	
+	|	IDENTIFIER URSHIFTEQ expression.e SEMICOLON			{: return new AssignS(new NumLabel(LabelUtility.nextLabel()),IDENTIFIER, URSHIFTEQ,e); :}	/* x >>>= expression*/				
+	;
+/*if else statement*/
+IfS	ifs = IF LPAREN condition.c RPAREN block.b1 ELSE block.b2			{:	return new IfS(c,b1,b2);	:}; /* if(){} else{} */ 
+
+/*while statement*/	
+WhileS whiles = WHILE LPAREN condition.c RPAREN block.b	{:	return new WhileS(c,b);	:} ;
+
+/*declare a variable*/	
+VarDecl vardecl = 	
+		VAR IDENTIFIER COLON varType.type SEMICOLON					{:	return new VarDecl(new NumLabel(LabelUtility.nextLabel()),VAR,IDENTIFIER,type);	:}/*Declare a variable as var*/
+	|	VAL IDENTIFIER COLON varType.type SEMICOLON					{:	return new VarDecl(new NumLabel(LabelUtility.nextLabel()),VAL,IDENTIFIER,type);	:}/*Declare a variable as val*/
+	;
+	
+/*define a variable*/	
+VarDef	vardef = 	
+		VAR IDENTIFIER COLON varType.type EQ expression.e SEMICOLON 	{:	return new VarDef (new NumLabel(LabelUtility.nextLabel()),VAR,IDENTIFIER,type,e);	:} /*Define a variable*/
+	|	VAL IDENTIFIER COLON varType.type EQ expression.e SEMICOLON 	{:	return new VarDef (new NumLabel(LabelUtility.nextLabel()),VAL,IDENTIFIER,type,e);	:} /*Define a variable*/
+	;
+	
+/**
+ *The type info of a variable or a function return type
+ */
+VarType varType = 
+		BYTE					{: return new VarType(BYTE); :}
+	|	INT						{: return new VarType(INT); :}
+	|	SHORT					{: return new VarType(SHORT); :}
+	|	LONG					{: return new VarType(LONG); :}
+	|	FLOAT					{: return new VarType(FLOAT); :}
+	|	DOUBLE					{: return new VarType(DOUBLE); :}
+	|	CHAR					{: return new VarType(CHAR); :}
+	|	STRING					{: return new VarType(STRING); :}
+	|	BOOLEAN					{: return new VarType(BOOLEAN); :}
+	|	UNIT					{: return new VarType(UNIT); :}
+	|	NULL					{: return new VarType(NULL); :}
+	|	NOTHING					{: return new VarType(NOTHING); :}
+	|	ANY						{: return new VarType(ANY); :}
+	|	ANYREF					{: return new VarType(ANYREF); :}
+	;
+
+/* Access modifiers of a class
+ * (public, private, protected,abstract,case)
+ */
+ClassProp classType = 
+		ABSTRACT			{: return new ClassProp(ABSTRACT); :}
+	|	PUBLIC				{: return new ClassProp(PUBLIC); :}
+	|	PRIVATE				{: return new ClassProp(PRIVATE); :}
+	|	PROTECTED			{: return new ClassProp(PROTECTED); :}
+	|	CASE				{: return new ClassProp(CASE); :}	
+	;
+
+/*basical expression*/
+Expression primary = 
+		IDENTIFIER					{:	return new VarRefExp(IDENTIFIER);	:}
+	|	NUMBER						{:	return new NumLitExp(NUMBER);	:}
+	|	TRUE						{:	return new BoolLitExp(TRUE);	:}
+	|	FALSE						{:	return new BoolLitExp(FALSE);	:}
+	| 	LPAREN expression.e RPAREN 	{: return e; :}
+	|	NOT primary.e				{:	return new NotExp(e);	:}
+	;
+
+/**arithmetic expression*/
+Expression aExp	=
+		primary.f						{:	return f;	:}
+	|	aExp.l	PLUS	primary.r		{:	return new AExp(l,new Op_a(PLUS),r);	:} 		//"+"
+	|	aExp.l	MINUS	primary.r		{:	return new AExp(l,new Op_a(MINUS),r);	:} 		//"-"
+	|	aExp.l	MULT	primary.r		{:	return new AExp(l,new Op_a(MULT),r);	:} 		//"*" 
+	|	aExp.l	DIV	primary.r			{:	return new AExp(l,new Op_a(DIV),r);	:} 			//"/" 
+	|	aExp.l	MOD	primary.r			{:	return new AExp(l,new Op_a(MOD),r);	:}			//"%"
+	|	aExp.l	LSHIFT	primary.r		{:	return new AExp(l,new Op_a(LSHIFT),r);	:}		//"<<"
+	|	aExp.l	RSHIFT	primary.r		{:	return new AExp(l,new Op_a(RSHIFT),r);	:}		//">>"
+	|	aExp.l	URSHIFT	primary.r		{:	return new AExp(l,new Op_a(URSHIFT),r);	:}		//">>>"	
+	;
+
+/**Relational expressions*/	
+Expression rExp = 
+		aExp.f						{:	return f;	:}
+	|	rExp.l GT aExp.r			{:	return new RExp(l,new Op_r(GT),r);	:}		//">"
+	|	rExp.l LT aExp.r			{:	return new RExp(l,new Op_r(LT),r);	:}		//"<"	
+	|	rExp.l COMP aExp.r			{:	return new RExp(l,new Op_r(COMP),r);	:}	//"~"
+	|	rExp.l QUESTION aExp.r		{:	return new RExp(l,new Op_r(QUESTION),r); :}	//"?"
+	|	rExp.l COLON aExp.r			{:	return new RExp(l,new Op_r(COLON),r);	:}	//":"
+	|	rExp.l EQEQ aExp.r			{:	return new RExp(l,new Op_r(EQEQ),r);	:}	//"=="
+	|	rExp.l LTEQ aExp.r			{:	return new RExp(l,new Op_r(LTEQ),r);	:}	//"<="
+	|	rExp.l GTEQ aExp.r			{:	return new RExp(l,new Op_r(GTEQ),r);	:}	//">="
+	|	rExp.l NOTEQ aExp.r			{:	return new RExp(l,new Op_r(NOTEQ),r);	:}	//"!=" 
+	|	rExp.l ANDAND aExp.r		{:	return new RExp(l,new Op_r(ANDAND),r);	:} 	//"&&"
+	|	rExp.l OROR aExp.r			{:	return new RExp(l,new Op_r(OROR),r);	:}	//"||"
+	;
+
+/**Boolean expressions*/
+Expression bExp = 
+		rExp.f						{:	return f;	:}
+	|	bExp.l OR rExp.r			{:	return new BExp(l,new Op_b(OR),r);	:}	//"|"
+	|	bExp.l AND rExp.r			{:	return new BExp(l,new Op_b(AND),r);	:}	//"&"
+	|	bExp.l XOR rExp.r			{:	return new BExp(l,new Op_b(XOR),r);	:}	//"^"
+	;
+	
+Expression expression = bExp.p		{:	return p;	:};
+
+LExp condition	=	expression.p	{:	return new LExp(new NumLabel(LabelUtility.nextLabel()),p);	:};
+

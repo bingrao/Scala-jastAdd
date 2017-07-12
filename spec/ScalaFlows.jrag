@@ -1,0 +1,191 @@
+import java.util.*;
+import utility.SetRepUtility;
+import utility.FlowGraph;
+aspect ScalaFlows {
+	
+	
+	/**
+	 * I use ArrayList and Map to implement flows. At first, I only use Map to implement it,
+	 * but there is a problem, because in the if statement, there are two edgs start from condition expression 
+	 * to S1 Or S2. that is (l0, l1) or (l0,l2). The keys of two edge are same, so Map will update the latest value, 
+	 * rather than insert a new instance.
+	 * */
+	public void Program.printFlows()
+	{
+		ArrayList<Map<NumLabel,NumLabel>> res = this.flows();
+		System.out.println("############The Number of flows is: "+res.size());
+		
+		Iterator<Map<NumLabel, NumLabel>> it = res.iterator();
+		while(it.hasNext())
+		{
+			Iterator<Map.Entry<NumLabel, NumLabel>> it1 = it.next().entrySet().iterator();
+			while(it1.hasNext()){
+				Map.Entry<NumLabel,NumLabel> var = it1.next();
+				System.out.println(var.getKey().getNum()+"-"+var.getValue().getNum());
+			}
+		}
+	}
+	/**flows inside of a block*/
+	syn ArrayList<Map<NumLabel,NumLabel>> Program.flows(){
+		//Program ::= Member:Class*;
+	   	ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+	   	for(Class m : getMemberList()){
+	   		ret.addAll(m.flows());
+	   	}
+	   	return ret;
+	}
+	    
+	syn ArrayList<Map<NumLabel,NumLabel>> Class.flows(){
+		//Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;
+	  	ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+	   	if(getProperties() != null)
+			ret.addAll(getProperties().flows());
+		if(getMethods() != null){
+			/**Because we are focus on intraprocedural analysis rather than interprocedural analysis
+			 * so for now we will not consider the analysis of methods*/
+			//ret.addAll(getMethods().flows());
+		}
+		return ret;
+	}
+	    
+	syn ArrayList<Map<NumLabel,NumLabel>> Properties.flows(){
+		
+		//Properties ::= PropS:Blockstmt*;
+		ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+		 for (int i = 0; i < getNumPropS(); i++) {
+		        ret.addAll(getPropS(i).flows());/*add current flows of current block*/
+		        if(i != getNumPropS()-1)
+		        {
+		            Set<NumLabel> finalsM1 = getPropS(i).finals();/*current final labels*/
+		        	NumLabel l = getPropS(i+1).init();
+		        	Iterator<NumLabel> it = finalsM1.iterator();
+		        	
+		        	while(it.hasNext()){
+		        		Map<NumLabel,NumLabel> tmp = new HashMap<NumLabel,NumLabel>();
+		        		tmp.put(it.next(),l);
+		        		ret.add(tmp);
+		        	}
+		        }
+		 }
+		 return ret;
+	}
+	    
+	syn ArrayList<Map<NumLabel,NumLabel>> Methods.flows()
+	{
+		//Methods  ::= Funcs:Function*;
+	   	ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+	   	for(Function f : getFuncsList()){
+	   		ret.addAll(f.flows());
+	   	}
+	   	return ret;
+	}
+	syn ArrayList<Map<NumLabel,NumLabel>> Function.flows(){
+		//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+	   	ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+	   	if(getFParam() != null)
+			ret.addAll(getFParam().flows());
+		if(getMbody() != null)
+			ret.addAll(getMbody().flows());
+		return ret;
+	}
+	syn ArrayList<Map<NumLabel,NumLabel>> FParam.flows(){
+		//FParam ::= Param:VarDecl*;
+	  	ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+	   	for(VarDecl p : getParamList())
+	   		ret.addAll(p.flows());
+	   	return ret;
+	}
+	syn ArrayList<Map<NumLabel,NumLabel>> Mbody.flows(){
+		//Mbody ::= Body:Blockstmt*;
+		ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+		 for (int i = 0; i < getNumBody(); i++) {
+		        ret.addAll(getBody(i).flows());/*add current flows of current block*/
+		        if(i != getNumBody()-1)
+		        {
+		            Set<NumLabel> finalsM1 = getBody(i).finals();/*current final labels*/
+		        	NumLabel l = getBody(i+1).init();
+		        	Iterator<NumLabel> it = finalsM1.iterator();
+		        	
+		        	while(it.hasNext()){
+		        		Map<NumLabel,NumLabel> tmp = new HashMap<NumLabel,NumLabel>();
+		        		tmp.put(it.next(),l);
+		        		ret.add(tmp);
+		        	}
+		        }
+		 }
+		 return ret;
+	}	
+
+	syn ArrayList<Map<NumLabel,NumLabel>> Block.flows();
+	eq Block.flows() {
+		//Block ::= BlockS:Blockstmt*;
+		ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+		 for (int i = 0; i < getNumBlockS(); i++) {
+		        ret.addAll(getBlockS(i).flows());/*add current flows of current block*/
+		        if(i != getNumBlockS()-1)
+		        {
+		            Set<NumLabel> finalsM1 = getBlockS(i).finals();/*current final labels*/
+		        	NumLabel l = getBlockS(i+1).init();
+		        	Iterator<NumLabel> it = finalsM1.iterator();
+		        	
+		        	while(it.hasNext()){
+		        		Map<NumLabel,NumLabel> tmp = new HashMap<NumLabel,NumLabel>();
+		        		tmp.put(it.next(),l);
+		        		ret.add(tmp);
+		        	}
+		        }
+		 }
+		 return ret;
+	}
+	
+	syn ArrayList<Map<NumLabel,NumLabel>> Blockstmt.flows();
+	eq AssignS.flows() = new ArrayList<Map<NumLabel,NumLabel>>();/*null*/
+	
+	eq IfS.flows() {
+		//IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;
+		ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+		/**
+		 * There is a bug here, the result of flows just contain one of "l0->l1" and "l0->l2"
+		 * I dont know why, but in my opinion, it is caused by the JVM Compiler optimazation.
+		 * 
+		 * This problem is caused by Map Set, because Map Set require unique key. 
+		 * So I use ArrayList to fix out this problem
+		 * */
+		NumLabel l0 = getConditionExp().getLabelAST(); /*condition label*/
+		NumLabel l1 = getB1().init(); /*The init label of first blcok*/
+		NumLabel l2 = getB2().init();/*The init label of second block*/
+
+		Map<NumLabel,NumLabel> tmp1 = new HashMap<NumLabel,NumLabel>();
+		tmp1.put(l0,l1);
+		ret.add(tmp1);
+		ret.addAll(getB1().flows());
+		
+		Map<NumLabel,NumLabel> tmp2 = new HashMap<NumLabel,NumLabel>();
+		tmp2.put(l0,l2);
+		ret.add(tmp2);
+		ret.addAll(getB2().flows());
+
+		return ret;
+	}
+	eq WhileS.flows(){
+		//WhileS:Blockstmt 	::= ConditionExp:LExp Block;
+		ArrayList<Map<NumLabel,NumLabel>> ret = new ArrayList<Map<NumLabel,NumLabel>>();
+				
+		NumLabel l = getConditionExp().getLabelAST();
+		Map<NumLabel,NumLabel> tmp = new HashMap<NumLabel,NumLabel>();
+		tmp.put(l,getBlock().init());
+		ret.add(tmp);
+		
+		ret.addAll(getBlock().flows());
+		
+	    Iterator<NumLabel> it = getBlock().finals().iterator(); /*final labels*/
+	    while(it.hasNext()){
+	    	Map<NumLabel,NumLabel> t = new HashMap<NumLabel,NumLabel>();
+	        t.put(it.next(),l);
+	        ret.add(t);
+	    }
+		return ret;
+	}
+	eq VarDecl.flows() = new ArrayList<Map<NumLabel,NumLabel>>();/*null*/
+	eq VarDef.flows() = new ArrayList<Map<NumLabel,NumLabel>>();/*null*/
+}

@@ -1,0 +1,9 @@
+public Class test5{
+	y >>= 4;
+	x = 7;
+	while(x>y)
+	{
+		x = 7;
+	}
+	x = 9;
+}

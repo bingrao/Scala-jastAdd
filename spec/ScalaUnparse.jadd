@@ -1,0 +1,368 @@
+/**
+ * 
+ * @author Bing
+ * 
+ * Tranverse the AST and unparse the program then print it out
+ */
+
+aspect ScalaUnparse {
+	/*
+	 * Define Statement unParse Function
+	 */
+	public void Program.printUnparse(){
+		/*Program ::= Member:Class*;*/
+		StringBuilder sb = new StringBuilder();
+		for(Class m : getMemberList()){
+			m.unParse(sb, 0);
+			sb.append("\n");
+		}
+		System.out.println("###############The Unparse info:\n"+sb.toString());
+		
+	}
+	public void Class.unParse(StringBuilder sb, int t){
+		/*Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;*/
+		getClassType().unParse(sb,t);
+		sb.append(" Class ").append(getClassName()).append("{\n");
+		
+		if(getProperties() != null)
+			getProperties().unParse(sb,t);
+		else
+			sb.append("\tNo Properties\n");
+		
+		if(getMethods() != null)
+			getMethods().unParse(sb,t);
+		else
+			sb.append("\tNo Methods\n");
+		
+		sb.append(getIndent(t)).append("}\n");
+	}
+	public void Properties.unParse(StringBuilder sb, int t) {
+		//Properties ::= PropS:Blockstmt*;
+		for (Blockstmt bs : getPropSList()) {
+			bs.unParse(sb, t+1);
+			sb.append("\n");
+		}
+	} 
+	public void Methods.unParse(StringBuilder sb, int t) {
+		//Methods  ::= Funcs:Function*;
+		sb.append("\n");
+		for(Function f : getFuncsList()){
+			f.unParse(sb,t+1);
+			sb.append("\n");	
+		}
+		sb.append("\n");
+	}
+	public void Function.unParse(StringBuilder sb, int t) {
+		//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+		sb.append(getIndent(t)).append("def ").append(getFuncName()).append("(");
+		if(getFParam() != null)
+			getFParam().unParse(sb,0);
+		sb.append(") : ");
+		if(getReturnType() != null)
+			getReturnType().unParse(sb,0);
+		else
+			sb.append("Union");
+		sb.append(" {\n");
+		if(getMbody() != null)
+			getMbody().unParse(sb,t+1);
+		sb.append(getIndent(t)).append(" }\n");
+	}
+	public void FParam.unParse(StringBuilder sb, int t) {
+		//FParam ::= Param:VarDecl*;
+		for(int i=0;i<getNumParam();i++){
+			getParam(i).unParse(sb,t);
+			if(i != (getNumParam()-1))
+				sb.append(",");
+		}
+	}
+	
+	public void Mbody.unParse(StringBuilder sb, int t) {
+		//Mbody ::= Body:Blockstmt*;
+		sb.append("\n");
+		for (Blockstmt bs : getBodyList()) {
+			bs.unParse(sb, t);
+			sb.append("\n");
+		}
+		sb.append("\n");
+	}
+	
+	
+	public void Block.unParse(StringBuilder sb, int t) {
+		/*Block ::= BlockS:Blockstmt*;*/
+		sb.append("\n").append(getIndent(t)).append("{\n");
+		for (Blockstmt bs : getBlockSs()) {
+			bs.unParse(sb, t+1);
+			sb.append("\n");
+		}
+		sb.append(getIndent(t)).append("}\n");
+	}
+	
+	abstract void Blockstmt.unParse(StringBuilder sb, int t); /*abstract Blockstmt;*/
+
+	public void AssignS.unParse(StringBuilder sb, int t){
+		/*AssignS:Blockstmt 	::= LabelAST:Label <VarName:String> Expression;*/
+		sb.append(getIndent(t)).append(getVarName()).append(" "+getOpType()+" ");
+		getExpression().unParse(sb,0);
+		sb.append(";");
+		this.printAnalysis(sb,t); /*define in BlockCell.jadd*/
+	}
+	public void IfS.unParse(StringBuilder sb, int t){
+		/*IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;*/
+		sb.append(getIndent(t)).append("if ");
+		getConditionExp().unParse(sb,t);
+		sb.append("\n").append(getIndent(t));
+		getB1().unParse(sb,t);
+		sb.append("\n").append(getIndent(t)).append("else");
+		getB2().unParse(sb,t);
+	}
+	public void WhileS.unParse(StringBuilder sb, int t){
+		/*WhileS:Blockstmt 	::= ConditionExp:LExp Block;*/
+		sb.append(getIndent(t)).append("while");
+		getConditionExp().unParse(sb,t);
+		sb.append("\n").append(getIndent(t));
+		getBlock().unParse(sb,t);
+	}
+	public void VarDecl.unParse(StringBuilder sb, int t){
+		/*VarDecl:Blockstmt 	::= LabelAST:Label <Varm> <VarName> Type:VarType;*/
+		sb.append(getIndent(t));
+		if(!getVarm().isEmpty())
+			sb.append(getVarm());
+		else
+			sb.append("val");
+		sb.append(" ").append(getVarName());
+		sb.append(":");
+		getType().unParse(sb,0);
+		sb.append(";");
+		this.printAnalysis(sb,t);
+		
+	}
+	public void VarDef.unParse(StringBuilder sb, int t){
+		/*VarDef:Blockstmt	::= LabelAST:Label <Varm> <VarName> Type:VarType Expression;*/
+		sb.append(getIndent(t));
+		sb.append(getVarm());
+		sb.append(" ").append(getVarName());
+		sb.append(":");
+		getType().unParse(sb,0);
+		sb.append(" = ");
+		getExpression().unParse(sb,0);
+		sb.append(";");
+		this.printAnalysis(sb,t);
+		
+	}
+	
+	/*
+	 * Define Expression unParse Function
+	 */
+	abstract void Expression.unParse(StringBuilder sb, int t); /*abstract Expression;*/
+	
+	public void VarRefExp.unParse(StringBuilder sb, int t){
+		/*VarRefExp:Expression 	::= <Contents>;*/
+		sb.append(getIndent(t)).append(getContents());
+	}
+	public void NumLitExp.unParse(StringBuilder sb, int t){
+		/*NumLitExp:Expression 	::= <Contents>;*/
+		sb.append(getIndent(t)).append(getContents());
+	}
+	public void BoolLitExp.unParse(StringBuilder sb, int t){
+		/*BoolLitExp:Expression  	::= <Contents>;*/
+		sb.append(getIndent(t)).append(getContents());
+	}
+	public void NotExp.unParse(StringBuilder sb, int t){
+		/*NotExp:Expression 		::= Expression;*/
+		sb.append(getIndent(t)).append("!(");
+		getExpression().unParse(sb,0);
+		sb.append(")");
+	}
+	public void LExp.unParse(StringBuilder sb, int t){
+		/*LExp:Expression 		::= LabelAST:Label Expression;*/
+		sb.append(getIndent(0));
+		if(getExpression().getClass().getName().equals("AST.AExp")||
+				getExpression().getClass().getName().equals("AST.RExp")||
+				getExpression().getClass().getName().equals("AST.BExp")||
+				getExpression().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getExpression().unParse(sb,0);
+		if(getExpression().getClass().getName().equals("AST.AExp")||
+				getExpression().getClass().getName().equals("AST.RExp")||
+				getExpression().getClass().getName().equals("AST.BExp")||
+				getExpression().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		this.printAnalysis(sb,t);
+		
+	}
+	public void AExp.unParse(StringBuilder sb, int t){
+		/*AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression;*/
+		sb.append(getIndent(t));
+		
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getLeft().unParse(sb,0);
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		sb.append(" ");
+		getOp().unParse(sb,0);
+		sb.append(" ");
+		
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getRight().unParse(sb,0);
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+	}
+	public void RExp.unParse(StringBuilder sb, int t){
+		/*RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression;*/
+		sb.append(getIndent(t));
+		
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getLeft().unParse(sb,0);
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		sb.append(" ");
+		getOp().unParse(sb,0);
+		sb.append(" ");
+		
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		
+		getRight().unParse(sb,0);
+		
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+	}
+	public void BExp.unParse(StringBuilder sb, int t){
+		/*BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression;*/
+		sb.append(getIndent(t));
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getLeft().unParse(sb,0);
+		if(getLeft().getClass().getName().equals("AST.AExp")||
+				getLeft().getClass().getName().equals("AST.RExp")||
+				getLeft().getClass().getName().equals("AST.BExp")||
+				getLeft().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+		sb.append(" ");
+		getOp().unParse(sb,0);
+		sb.append(" ");
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append("(");
+		}
+		getRight().unParse(sb,t);
+		if(getRight().getClass().getName().equals("AST.AExp")||
+				getRight().getClass().getName().equals("AST.RExp")||
+				getRight().getClass().getName().equals("AST.BExp")||
+				getRight().getClass().getName().equals("AST.LExp")){
+			sb.append(")");
+		}
+	}
+	
+	/*
+	 *Define Op unParse function
+ 
+	 *abstract Op ::= <Contents>;
+	 *Op_b : Op;
+	 *Op_r : Op;
+	 *Op_a : Op;
+	*/
+	public void Op.unParse(StringBuilder sb, int t){
+		sb.append(getIndent(t)).append(getContents());
+	}
+	/*
+	 *Define Label unParse function
+	 */
+	abstract void Label.unParse(StringBuilder sb, int t); /*abstract Label;;*/
+	public void VarType.unParse(StringBuilder sb, int t){
+		/*VarType:Label  	::= <KeyWord>;*/
+		sb.append(getIndent(t)).append(getKeyWord());
+	}
+	public void NumLabel.unParse(StringBuilder sb, int t){
+		/*NumLabel:Label 	::= <Num>;*/
+		sb.append(getIndent(t)).append(getNum());
+	}
+	public void ClassProp.unParse(StringBuilder sb, int t){
+		/*ClassProp:Label  	::= <KeyWord>;*/
+		sb.append(getIndent(t)).append(getKeyWord());
+	}
+	/**
+	 * 
+	 * */
+	syn String Block.unParse();
+	eq Block.unParse(){
+		StringBuilder sb = new StringBuilder();
+		for (Blockstmt bs : getBlockSs()) {
+			sb.append(bs.unParse()).append("\n");
+		}
+		return sb.toString();
+	}
+	syn String Blockstmt.unParse(); /*abstract Blockstmt;*/
+	eq Blockstmt.unParse()
+	{
+		StringBuilder sb = new StringBuilder();
+		this.unParse(sb,0);
+		return sb.toString();
+	}
+	syn String Expression.unParse(); /*abstract Blockstmt;*/
+	eq Expression.unParse()
+	{
+		StringBuilder sb = new StringBuilder();
+		this.unParse(sb,0);
+		return sb.toString();
+	}
+	syn String Op.unParse(); 
+	eq Op.unParse()
+	{
+		StringBuilder sb = new StringBuilder();
+		this.unParse(sb,0);
+		return sb.toString();
+	}
+	
+	syn String Label.unParse(); /*abstract Label;;*/
+	eq Label.unParse()
+	{
+		StringBuilder sb = new StringBuilder();
+		this.unParse(sb,0);
+		return sb.toString();
+	}
+}

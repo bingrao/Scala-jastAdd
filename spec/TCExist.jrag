@@ -1,0 +1,24 @@
+import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+import utility.SetRepUtility;
+import utility.Type;
+/**
+ * @author Bing
+ * Chaeck the Variable whether or not has been define in this program.
+ *
+ */
+aspect TCExist {
+	public void Program.typeCheckExist(String varName){
+		Map<String,Type> sb = new HashMap<String,Type>();
+		this.FV(sb);
+		if(sb.containsKey(varName))
+		{
+			System.out.println("The Variable does exist: "+varName+":"+sb.get(varName).getName());
+		}
+		else
+		{
+			System.out.println("The Variable does not exit: "+varName);
+		}
+	}
+}

@@ -1,0 +1,194 @@
+import java.util.*;
+import utility.SetRepUtility;
+import utility.FlowGraph;
+/**
+ * 
+ * @author Bing 
+ * I define init() and finals() in a blockstmt to represent 
+ * the initiale and finals labels information
+ * Ref. Principles of Program Analysis, section 2.1.1. Nielsen, Nielsen, and Hankin
+ * 
+ * The information will be printed in printAST()
+ */
+aspect ScalaLabels {
+
+	/**The initial NumLabel of an AST node*/
+	syn NumLabel Program.init() {
+		if(getNumMember() != 0)
+			return getMember(0).init();
+		else
+			return new NumLabel("0");
+	}
+	syn NumLabel Class.init() {
+		
+		/**
+		 * Because we are focus on intraprocedural analysis rather than interprocedural analysis
+		 * So the initial label of Properties is the program init label*/
+		if(getProperties() != null)
+			return getProperties().init();
+		/*
+		else if(getMethods() != null)
+			return getMethods().init();
+		*/
+		else
+			return new NumLabel("0");
+	}
+	syn NumLabel Properties.init() {
+		if(getNumPropS() != 0)
+			return getPropS(0).init();
+		else
+			return new NumLabel("0");
+	}
+	syn NumLabel Methods.init() {
+		if(getNumFuncs() != 0)
+			return getFuncs(0).init();
+		else
+			return new NumLabel("0");
+	}
+	syn NumLabel Function.init() {
+		if(getFParam() != null)
+			return getFParam().init();
+		else if(getMbody() != null)
+			return getMbody().init();
+		else
+			return new NumLabel("0");
+	}
+	syn NumLabel FParam.init() {
+		if(getNumParam() != 0)
+			return getParam(0).init();
+		else
+			return new NumLabel("0");
+	}
+	syn NumLabel Mbody.init() {
+		if(getNumBody() != 0)
+			return getBody(0).init();
+		else
+			return new NumLabel("0");
+	}
+	
+	syn NumLabel Block.init() {
+		if(getNumBlockS()!= 0)
+			return getBlockS(0).init();
+		else
+			return new NumLabel("0");
+					
+	}
+	syn NumLabel Blockstmt.init();
+	eq AssignS.init() = this.getLabelAST();
+	eq IfS.init() = this.getConditionExp().getLabelAST();
+	eq WhileS.init() = this.getConditionExp().getLabelAST();
+	eq VarDecl.init() = this.getLabelAST();
+	eq VarDef.init() = this.getLabelAST();	
+
+
+	/** The set of final labels of an AST node. */
+	syn Set<NumLabel> Program.finals(){
+		Set<NumLabel> h = new HashSet<NumLabel>();
+		if(getNumMember() != 0)
+			h.addAll(getMember(getNumMember()-1).finals());
+		return h;
+	}
+	syn Set<NumLabel> Class.finals(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		
+		/**Because we are focus on intraprocedural analysis rather than interprocedural analysis
+		 * so for now we will not consider the analysis of methods*/
+		/*
+		if(getMethods() != null)
+			ret.addAll(getMethods().finals());
+		else if(getProperties() != null)
+			ret.addAll(getProperties().finals());
+		*/	
+		if(getProperties() != null)
+			ret.addAll(getProperties().finals());
+		return ret;
+	}
+	syn Set<NumLabel> Properties.finals(){
+    	Set<NumLabel> ret = new HashSet<NumLabel>();
+    	if(getNumPropS() != 0)
+    		ret.addAll((getPropS(getNumPropS()-1)).finals());
+    	return ret;
+    }
+	
+    syn Set<NumLabel> Methods.finals()
+    {
+    	Set<NumLabel> ret = new HashSet<NumLabel>();
+    	if(getNumFuncs() != 0)
+    		ret.addAll(getFuncs(getNumFuncs()-1).finals());
+    	return ret;
+    }
+    syn Set<NumLabel> Function.finals(){
+    	Set<NumLabel> ret = new HashSet<NumLabel>();
+    	if(getMbody() != null)
+			ret.addAll(getMbody().finals());
+    	else if(getFParam() != null)
+			ret.addAll(getFParam().finals());
+		return ret;
+    }
+    syn Set<NumLabel> FParam.finals(){
+    	Set<NumLabel> ret = new HashSet<NumLabel>();
+    	
+    	if(getNumParam() != 0)
+    		ret.addAll(getParam(getNumParam()-1).finals());
+    	return ret;
+    }
+    syn Set<NumLabel> Mbody.finals(){
+    	Set<NumLabel> ret = new HashSet<NumLabel>();
+    	
+    	if(getNumBody() != 0)
+    		ret.addAll(getBody(getNumBody()-1).finals());
+    	return ret;
+    }
+	syn Set<NumLabel> Block.finals();
+	eq Block.finals() {
+		Set<NumLabel> h = new HashSet<NumLabel>();
+		if(getNumBlockS() != 0)
+			h.addAll(getBlockS(getNumBlockS()-1).finals());
+		return h;
+	}
+	syn Set<NumLabel> Blockstmt.finals();
+	eq AssignS.finals(){
+		Set<NumLabel> h = new HashSet<NumLabel>();
+		h.add(this.getLabelAST());
+		return h;
+	}
+	eq IfS.finals(){
+		Set<NumLabel> ret = new HashSet<NumLabel>();
+		ret.addAll(getB1().finals());
+		ret.addAll(getB2().finals());
+		return ret;
+	}
+	eq WhileS.finals() {
+		Set<NumLabel> h = new HashSet<NumLabel>();
+		h.add(getConditionExp().getLabelAST());
+		return h;
+	}
+	eq VarDecl.finals(){
+		Set<NumLabel> h = new HashSet<NumLabel>();
+		h.add(getLabelAST());
+		return h;
+	}
+	eq VarDef.finals() {
+		Set<NumLabel> h = new HashSet<NumLabel>();
+		h.add(getLabelAST());
+		return h;
+	}
+	public Boolean Blockstmt.printStateLabel(StringBuilder sb, int t){
+		NumLabel init = this.init();
+		Set<NumLabel> finalsL = this.finals();
+		Iterator<NumLabel> it = finalsL.iterator();
+		String finalLabel = ", Final:";
+		while(it.hasNext()){
+			finalLabel +=" " + it.next().getNum();
+		}
+		String ret = "Init: "+init.getNum()+finalLabel;
+		sb.append(getIndent(t)).append(ret).append(",");
+		return true;
+	}
+	
+	eq  IfS.getConditionExp().printStateLabel(StringBuilder sb, int t) = this.printStateLabel(sb,t);
+	eq  WhileS.getConditionExp().printStateLabel(StringBuilder sb, int t) = this.printStateLabel(sb,t);
+	eq  AssignS.getExpression().printStateLabel(StringBuilder sb, int t) = this.printStateLabel(sb,t);
+	eq  VarDef.getExpression().printStateLabel(StringBuilder sb, int t) = this.printStateLabel(sb,t);
+	inh Boolean Expression.printStateLabel(StringBuilder sb, int t);
+}

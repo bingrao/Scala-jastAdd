@@ -1,0 +1,91 @@
+import utility.Type;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+/**
+ * @author Bing
+ * Based on the type of Expression, I have defined a series of rules to represent 
+ * basic type system.
+ */
+aspect ScalaExpType {
+	/*
+	 * Define Expression expType Function
+	 */
+	syn Type Expression.expType(Map<String,Type> sb); /*abstract Expression;*/
+	eq VarRefExp.expType(Map<String,Type> sb){
+		/*VarRefExp:Expression 	::= <Contents>;*/
+		
+		/* if we call FV to check type info, there will be a circle calculation here.
+		 * VarRefExp.expType --> FV --> VarRefExp.expTyep
+		 * */
+		String var = getContents();
+		if(sb.containsKey(var))
+			return sb.get(var);
+		else
+			return Type.Unknown;
+	}
+	eq NumLitExp.expType(Map<String,Type> sb){
+		/*NumLitExp:Expression 	::= <Contents>;*/
+		/**
+		 * if possible, we should detect whether or not Contents is a number
+		 */
+		return Type.Int;
+	}
+	eq BoolLitExp.expType(Map<String,Type> sb){
+		/*BoolLitExp:Expression  	::= <Contents>;*/
+		/**
+		 * true or false
+		 */    
+		return Type.Bool;
+	}
+	eq NotExp.expType(Map<String,Type> sb){
+		/*NotExp:Expression 		::= Expression;*/
+		/** !(x>y)
+		 * Here we require the type of Expression should be boolean
+		 * */
+		
+		if(getExpression().expType(sb) != Type.Bool)
+			return Type.Error;
+		else
+			return Type.Bool;
+	}
+	eq LExp.expType(Map<String,Type> sb){
+		/*LExp:Expression 		::= LabelAST:Label Expression;*/
+		/**
+		 * Expression should be boolean type here.
+		 * for example: x>y
+		 */
+		if(getExpression().expType(sb) != Type.Bool)
+			return Type.Error;
+		else
+			return Type.Bool;
+	}
+	eq AExp.expType(Map<String,Type> sb){
+		/*AExp:Expression 		::= Left:Expression Op:Op_a Right:Expression;*/
+		if(getLeft().expType(sb) == getRight().expType(sb)){
+			/*the type of left and right operands should be equal*/
+			return getLeft().expType(sb);
+		}else {
+			return Type.Error;
+		}
+	}
+	eq RExp.expType(Map<String,Type> sb){
+		/*RExp:Expression 		::= Left:Expression Op:Op_r Right:Expression;*/
+		/**
+		 * result should be true or false.
+		 */
+		if(getLeft().expType(sb) == getRight().expType(sb)){
+			return Type.Bool;
+		}else {
+			return Type.Error;
+		}
+	}
+	eq BExp.expType(Map<String,Type> sb){
+		/*BExp:Expression 		::= Left:Expression Op:Op_b Right:Expression;*/
+		if(getLeft().expType(sb) == getRight().expType(sb)){
+			return getLeft().expType(sb);
+		}else {
+			return Type.Error;
+		}
+	}
+}

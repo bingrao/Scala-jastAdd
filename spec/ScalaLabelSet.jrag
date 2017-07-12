@@ -1,0 +1,150 @@
+import java.util.*;
+import utility.SetRepUtility;
+import utility.FlowGraph;
+
+/**
+ * @author Bing
+ * Collect the label info of a program and print them out
+ */
+aspect ScalaLabelSet {
+	/**
+	 * The set of labes of an AST Node*/
+	public void Program.labels(Set<NumLabel> sb){
+		//Program ::= Member:Class*;
+		for(Class m : getMemberList()){
+			m.labels(sb);
+		}
+	}
+	public void Class.labels(Set<NumLabel> sb){
+		//Class ::= ClassType:ClassProp <ClassName:String> Properties Methods;
+		if(getProperties() != null)
+			getProperties().labels(sb);
+		
+		/**Because we are focus on intraprocedural analysis rather than interprocedural analysis
+		 * so for now we will not consider the analysis of methods*/
+		/*
+		if(getMethods() != null)
+			getMethods().labels(sb);
+		*/
+	}
+	public void Properties.labels(Set<NumLabel> sb) {
+		//Properties ::= PropS:Blockstmt*;
+		for (Blockstmt bs : getPropSList()) {
+			bs.labels(sb);
+		}
+	} 
+	public void Methods.labels(Set<NumLabel> sb) {
+		//Methods  ::= Funcs:Function*;
+		for(Function f : getFuncsList()){
+			f.labels(sb);
+		}
+	}
+	public void Function.labels(Set<NumLabel> sb) {
+		//Function ::= <FuncName:String> FParam ReturnType:VarType Mbody;
+		if(getFParam() != null)
+			getFParam().labels(sb);
+
+		if(getMbody() != null)
+			getMbody().labels(sb);
+
+	}
+	public void FParam.labels(Set<NumLabel> sb) {
+		//FParam ::= Param:VarDecl*;
+		for(int i=0;i<getNumParam();i++){
+			getParam(i).labels(sb);
+		}
+	}
+	
+	public void Mbody.labels(Set<NumLabel> sb) {
+		//Mbody ::= Body:Blockstmt*;
+		for (Blockstmt bs : getBodyList()) {
+			bs.labels(sb);
+		}
+	}
+	
+	public void Block.labels(Set<NumLabel> sb){
+		//Block ::= BlockS:Blockstmt*;
+		for (Blockstmt bs : getBlockSs()) {
+			bs.labels(sb);
+		}
+	}
+	abstract void Blockstmt.labels(Set<NumLabel> sb);
+	public void AssignS.labels(Set<NumLabel> sb){
+		//AssignS:Blockstmt 	::= LabelAST:NumLabel <VarName:String> Expression
+		sb.add(getLabelAST());
+	}
+	public void IfS.labels(Set<NumLabel> sb){
+		//IfS:Blockstmt 		::= ConditionExp:LExp B1:Block B2:Block;
+		sb.add(getConditionExp().getLabelAST());
+		getB1().labels(sb);
+	    getB2().labels(sb);
+	}
+	public void WhileS.labels(Set<NumLabel> sb){
+		//WhileS:Blockstmt 	::= ConditionExp:LExp Block;
+		sb.add(getConditionExp().getLabelAST());
+		getBlock().labels(sb);
+	}
+	public void VarDecl.labels(Set<NumLabel> sb){
+		//VarDecl:Blockstmt 	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType;
+		sb.add(getLabelAST());
+	}
+	public void VarDef.labels(Set<NumLabel> sb){
+		//VarDef:Blockstmt	::= LabelAST:NumLabel <Varm> <VarName> Type:VarType Expression;
+		sb.add(getLabelAST());
+	}
+	/**Print the label set of this program*/
+	public void Program.printLabelSet(){
+		Set<NumLabel> res = this.labels();
+		Iterator<NumLabel> it = res.iterator();
+		//this.printAST();
+		System.out.print("##############The Label Set of this program:");
+		while(it.hasNext()){
+			System.out.print(" "+it.next().getNum());
+		}
+		System.out.println();
+	}
+	public Set<NumLabel> Program.labels(){
+		Set<NumLabel> sb = new HashSet<NumLabel>();
+		this.labels(sb);
+		return sb;
+	}
+	
+	public Set<NumLabel> Properties.labels(){
+		Set<NumLabel> sb = new HashSet<NumLabel>();
+		this.labels(sb);
+		return sb;
+	}
+	public Set<NumLabel> Mbody.labels(){
+		Set<NumLabel> sb = new HashSet<NumLabel>();
+		this.labels(sb);
+		return sb;
+	}
+	public Set<NumLabel> FParam.labels(){
+		Set<NumLabel> sb = new HashSet<NumLabel>();
+		this.labels(sb);
+		return sb;
+	}
+	
+	public Set<NumLabel> Block.labels(){
+		Set<NumLabel> sb = new HashSet<NumLabel>();
+		this.labels(sb);
+		return sb;
+	}
+	public Set<NumLabel> Blockstmt.labels(){
+		Set<NumLabel> sb = new HashSet<NumLabel>();
+		this.labels(sb);
+		return sb;
+	}
+	
+	// the following are needed so that labels can be hashed...
+    /** Are these labels equal? */
+	public boolean NumLabel.equals(Object oth) {
+	   if (oth == null || !(oth instanceof NumLabel)) { return false; }
+	   NumLabel l = (NumLabel) oth;
+	   return getNum().equals(l.getNum());
+	}
+	/** Return the hash code for this NumLabel. */
+	public int NumLabel.hashCode() {
+	   return getNum().hashCode();
+	}
+}

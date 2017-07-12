@@ -1,0 +1,137 @@
+import java.util.Map;
+import utility.Pair;
+import utility.SetRepUtility;
+import AST.*;
+/**
+ * @author Bing
+ * 
+ *  Ref. Principles of Program Analysis, section 2.1.1. Nielsen, Nielsen, and Hankin
+ */
+ 
+aspect RD {
+	/** The kill function for reaching definitions. */
+	syn Set<Map.Entry<String,NumLabel>> BlockCell.killRD();
+	eq AssignS.killRD() {
+		
+		Set<Map.Entry<String,NumLabel>> ret = new HashSet<Map.Entry<String,NumLabel>>();
+		ret.add(new Pair(getVarName(),new NumLabel("?")));
+		
+		/**
+		 * According to the definition of Kill statement, Here we should use (x,l) to represnet that variable
+		 * x has been killed at label l in the Program. However cosidering the property of "\" and program easily,
+		 * we assume that variable x has been changed at every statement.
+		 * */
+		Set<NumLabel> tmp = this.progLabels();
+		Iterator<NumLabel> it = tmp.iterator();
+		while(it.hasNext())
+		{
+			ret.add(new Pair<String,NumLabel>(getVarName(),it.next()));
+		}
+		return ret;
+    }
+	eq VarDef.killRD() {
+		
+		Set<Map.Entry<String,NumLabel>> ret = new HashSet<Map.Entry<String,NumLabel>>();
+		ret.add(new Pair(getVarName(),new NumLabel("?")));
+		
+		Set<NumLabel> tmp = this.progLabels();
+		Iterator<NumLabel> it = tmp.iterator();
+		while(it.hasNext())
+		{
+			ret.add(new Pair<String,NumLabel>(getVarName(),it.next()));
+		}
+		return ret;
+    }
+	eq VarDecl.killRD() = new HashSet<Map.Entry<String,NumLabel>>();
+	eq LExp.killRD() = new HashSet<Map.Entry<String,NumLabel>>();
+	
+	/**
+	 * The gen function for reaching definitions.*/
+	syn Set<Map.Entry<String,NumLabel>> BlockCell.genRD();
+	eq AssignS.genRD()
+	{
+		Set<Map.Entry<String,NumLabel>> ret = new HashSet<Map.Entry<String,NumLabel>>();
+		ret.add(new Pair<String,NumLabel>(getVarName(), getLabelAST()));
+		return ret;
+	}
+	eq VarDef.genRD()
+	{
+		Set<Map.Entry<String,NumLabel>> ret = new HashSet<Map.Entry<String,NumLabel>>();
+		ret.add(new Pair<String,NumLabel>(getVarName(), getLabelAST()));
+		return ret;
+	}
+	eq VarDecl.genRD() = new HashSet<Map.Entry<String,NumLabel>>();
+	eq LExp.genRD() = new HashSet<Map.Entry<String,NumLabel>>();
+
+	/**
+	 * There is a bug here about while statement, because this kind circular computation will 
+	 * cause a deadlock in a while statement. for example:
+	 * while(x>y)  ---1
+	 * {
+	 * 		x=5;   ---2;
+	 * }
+	 * in order to calculate the RDentry(1) we need know RDexit(2), while RDexit(2) is designed by RDentry(2)
+	 * According to RDentry definition, RDentry(2) acturally is equal to RDexit(1). we can use RDentry(1) to
+	 * calculate RDexit(1).
+	 * RDentry(1)<--RDexit(2)<---RDentry(2) == RDexit(1)<-- RDentry(1)
+	 * 
+	 * 
+	 * Use Set to instead of ArrayList to fix out this problem Recommended by Dr. Gary T. Leavens
+	 */
+	
+	
+	/** data flow equations about RD -- RDentry and RDexit*/	
+	syn Set<Map.Entry<String,NumLabel>> BlockCell.RDentry() circular [new HashSet<Map.Entry<String,NumLabel>>()];
+    eq BlockCell.RDentry() {
+    	Set<Map.Entry<String,NumLabel>> ret = new HashSet<Map.Entry<String,NumLabel>>();
+		if (getLabelAST().equals(progInitLabel())) {
+			/**if l = init(S*)*/
+			Set<String> res = progFV().keySet();
+			Iterator<String> it = res.iterator();
+			while(it.hasNext()){
+				ret.add(new Pair<String,NumLabel>(it.next(),new NumLabel("?")));
+			}
+		} else {
+			/**Union RDexit(l) where (l, getLabelAST()) belongs to the flows*/
+			for (NumLabel l : inFlows()) {
+				BlockCell b = l.itsBlockCell();
+				ret.addAll(b.RDexit());
+			}
+		}
+		return ret;
+	}
+	syn Set<Map.Entry<String,NumLabel>> BlockCell.RDexit() circular [new HashSet<Map.Entry<String,NumLabel>>()];
+    eq BlockCell.RDexit() {
+    	Set<Map.Entry<String,NumLabel>> ret = new HashSet<Map.Entry<String,NumLabel>>();
+  
+		ret.addAll(this.RDentry());
+		ret.removeAll(this.killRD());
+		ret.addAll(this.genRD());
+		return ret;
+    }
+    
+    /**Print the entry and exit information of Reaching Definition*/
+	public void BlockCell.printRD(StringBuilder sb, int t){
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");
+		//this.printStateLabel(sb,t);
+		//this.printInOutLabels(sb,t);
+		NumLabel l = getLabelAST();
+		sb.append(" ").append(getIndent(0)).append("RDentry("+l.getNum()+"): ");
+		Object[] tmp = this.RDentry().toArray();
+		for(int i=0;i<tmp.length;i++)
+		{
+			Map.Entry<String,NumLabel> res = (Map.Entry<String,NumLabel>)tmp[i];
+			sb.append("("+res.getKey()+","+res.getValue().getNum()+") ");
+		}
+		
+		sb.append(" ").append("RDexit("+l.getNum()+"): ");
+		tmp = this.RDexit().toArray();
+		for(int j=0;j<tmp.length;j++)
+		{
+			Map.Entry<String,NumLabel> res = (Map.Entry<String,NumLabel>)tmp[j];
+			sb.append("("+res.getKey()+","+res.getValue().getNum()+") ");
+		}
+		//sb.append("\n").append(getIndent(t)).append("***************************************************").append("\n");
+    }
+
+}
